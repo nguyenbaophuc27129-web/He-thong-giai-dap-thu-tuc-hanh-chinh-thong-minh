@@ -1,120 +1,1149 @@
-# ============================================================
-# 🏛️ AI HÀNH CHÍNH CÔNG COMPLETE - MAIN.PY
-# 100% CODE TỪ JUPYTER NOTEBOOK - GIỮ NGUYÊN TOÀN BỘ
-# File chạy độc lập, không cần tương tác, có thể thực thi từ đầu đến cuối
-# ============================================================
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 # ============================================================
-# PHẦN 1: IMPORT & CẤU HÌNH
+# PHẦN 12.7: LAUNCH APP PRO
+# ============================================================
+
+print('='*70)
+print('🚀 KHỞI ĐỘNG ỨNG DỤNG AI PRO')
+print('='*70)
+print()
+
+print('📊 Thống kê:')
+print(f'   - Dataset: {len(df1) + len(df2):,} samples + {len(DICHVUCONG_DATA)} thủ tục')
+print(f'   - Situations: {len(SITUATIONS)}')
+print(f'   - Personas: {len(AI_PERSONAS)}')
+print(f'   - Query Patterns: {len(QUERY_PATTERNS)}')
+print(f'   - Model: Qwen 2.5 3B')
+print(f'   - RAG: Hybrid + Re-ranking')
+print(f'   - Voice: Whisper + Edge-TTS')
+print()
+
+print('='*70)
+print('  Đang tạo public link...')
+print('  Link sẽ xuất hiện bên dưới sau vài giây...')
+print('='*70)
+print()
+
+# Launch với demo_pro thay vì demo
+demo_pro.launch(
+    share=True,
+    server_name='0.0.0.0',
+    show_error=True
+)
+# ============================================================
+# PHẦN 12.6: UPDATE GRADIO INTERFACE VỚI AI PRO
+# ============================================================
+
+print('='*70)
+print('🖥️ CẬP NHẬT GRADIO INTERFACE VỚI AI PRO')
+print('='*70)
+print()
+
+import gradio as gr
+import os # Make sure os is imported
+
+# Admin functions (moved from previous cell or redefined for this scope)
+admin_procedures = list(DICHVUCONG_DATA.values())
+
+def get_procedures_list():
+    lines = ["| Mã | Tên thủ tục | Cơ quan |"]
+    lines.append("|---|---|---|")
+    for p in admin_procedures[:20]: # Limit to 20 for display
+        lines.append(f"| {p['code']} | {p['name']} | {p['coquan']} |")
+    return "\n".join(lines)
+
+def admin_add(code, name, docs, coquan, time_val, lephi, note, steps):
+    global admin_procedures
+    new_proc = {
+        'code': code, 'name': name, 'docs': docs, 'coquan': coquan,
+        'time': time_val, 'lephi': lephi, 'note': note, 'steps': steps
+    }
+    admin_procedures.append(new_proc)
+    # For simplicity, we are not updating DICHVUCONG_DATA or Pinecone here directly
+    # In a real application, you would update the backend data source
+    return f"✅ Đã thêm: {code} - {name}", get_procedures_list()
+
+# Chat function với AI Process PRO
+def process_chat_pro(audio, text, history, persona="thuong"):
+    try:
+        if history is None:
+            history = []
+
+        # Cập nhật persona
+        conversation_memory.set_persona(persona)
+
+        # Xử lý input
+        query = ''
+        if audio and not os.path.isdir(audio):
+            query = speech_to_text(audio)
+        elif text and text.strip():
+            query = text.strip()
+
+        if len(query) < 3:
+            return history, None, ''
+
+        # Dùng AI Process PRO
+        result = ai_process_pro(query, use_memory=True)
+
+        # Format response
+        response = f"""**🏛️ AI HÀNH CHÍNH CÔNG VIP PRO**
+
+**📋 Tình huống:** `{result['situation']}`
+
+{result['response']}
+
+---
+_⏱️ Xử lý: {result['process_time']}s | 📄 Tài liệu: {result['docs_count']} | 🌡️ Temp: {result['temperature']}_"""
+
+        history.append({"role": "user", "content": query})
+        history.append({"role": "assistant", "content": response})
+
+        # TTS
+        audio_out = None
+        try:
+            loop = asyncio.get_event_loop()
+        except:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        try:
+            audio_out = loop.run_until_complete(text_to_speech(result['response']))
+        except:
+            pass
+
+        return history, audio_out, ''
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        error_msg = f"Lỗi: {str(e)}"
+        return history, None, error_msg
+
+def clear_chat_pro():
+    conversation_memory.clear()
+    return [], None, ''
+
+def change_persona(new_persona):
+    conversation_memory.set_persona(new_persona)
+    persona_names = {
+        "thuong": "Chị Thuong - Thân thiện",
+        "chuyen": "Anh Chuyen - Chuyên nghiệp",
+        "chi_tiet": "Cô Chi Tiet - Chi tiết"
+    }
+    return f"✅ Đã chuyển sang: {persona_names.get(new_persona, new_persona)}"
+
+# Build PRO interface
+pro_css = """
+.gradio-container {
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+.chatbot {
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+.pro-badge {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-weight: bold;
+}
+"""
+
+with gr.Blocks(theme=gr.themes.Soft(primary_hue='violet', secondary_hue='purple'),
+               css=pro_css) as demo_pro:
+
+    gr.HTML("""
+    <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; margin-bottom: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+        <h1 style="color: white; margin: 0; font-size: 2.8em; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">🏛️ AI HÀNH CHÍNH CÔNG VIP PRO</h1>
+        <p style="color: white; margin: 15px 0 0 0; font-size: 1.2em;">Version 2.0 - Tự nhiên hơn, nhanh hơn, thông minh hơn</p>
+        <p style="color: #ffd700; margin: 10px 0 0 0; font-weight: bold; font-size: 1.3em;">🏆 GIẢI NHẤT TP.HCM - DEEPLEARNING EDITION</p>
+        <div style="margin-top: 15px;">
+            <span class="pro-badge">Context Memory</span>
+            <span class="pro-badge">Chain of Thought</span>
+            <span class="pro-badge">Dynamic Temperature</span>
+        </div>
+    </div>
+    """)
+
+    with gr.Tabs():
+        # Chat Tab
+        with gr.Tab("💬 Chat AI VIP PRO"):
+            with gr.Row():
+                with gr.Column(scale=2):
+                    chat = gr.Chatbot(height=550, type='messages', label='💬 Lịch sử chat',
+                                     show_copy_button=True)
+                    audio_out = gr.Audio(label='🔊 Nghe câu trả lời', autoplay=True)
+
+                with gr.Column(scale=1):
+                    # Persona selector
+                    persona_selector = gr.Radio(
+                        choices=[
+                            ("👩‍💼 Chị Thuong - Thân thiện, gần gũi", "thuong"),
+                            ("👨‍💼 Anh Chuyen - Chuyên nghiệp, ngắn gọn", "chuyen"),
+                            ("👩‍🏫 Cô Chi Tiet - Chi tiết, từng bước", "chi_tiet")
+                        ],
+                        value="thuong",
+                        label="🎭 Chọn phong cách tư vấn:",
+                        interactive=True
+                    )
+                    persona_status = gr.Textbox(label="Trạng thái", interactive=False)
+
+                    gr.HTML("<br>")
+
+                    audio_in = gr.Audio(sources=['microphone'], type='filepath',
+                                       label='🎤 Nói câu hỏi')
+                    msg_in = gr.Textbox(label='✏️ Hoặc gõ câu hỏi', lines=4,
+                                       placeholder='Ví dụ: Làm bằng lái xe máy cần giấy tờ gì?')
+
+                    with gr.Row():
+                        btn_send = gr.Button('🚀 GỬI', variant='primary', size='lg')
+                        btn_clear = gr.Button('🔄 LÀM MỚI', size='lg')
+
+            gr.Examples(
+                examples=[
+                    [None, 'Làm bằng lái xe máy cần giấy tờ gì?', 'thuong'],
+                    [None, 'Khai sinh quá hạn phải làm sao?', 'chi_tiet'],
+                    [None, 'Đăng ký xe ô tô mới ở đâu?', 'chuyen'],
+                    [None, 'Tách hộ khẩu cần những gì?', 'thuong'],
+                    [None, 'Làm hộ chiếu bao nhiêu tiền?', 'thuong']
+                ],
+                inputs=[audio_in, msg_in, persona_selector]
+            )
+
+            # Event handlers
+            btn_send.click(process_chat_pro, [audio_in, msg_in, chat, persona_selector],
+                          [chat, audio_out, msg_in])
+            msg_in.submit(process_chat_pro, [audio_in, msg_in, chat, persona_selector],
+                         [chat, audio_out, msg_in])
+            btn_clear.click(clear_chat_pro, [], [chat, audio_out, msg_in])
+            persona_selector.change(change_persona, [persona_selector], [persona_status])
+
+        # Admin Tab (cải tiến)
+        with gr.Tab("⚙️ Admin Panel PRO"):
+            gr.Markdown("### ➕ Thêm thủ tục mới (AI sẽ học ngay)")
+
+            with gr.Row():
+                with gr.Column():
+                    admin_code = gr.Textbox(label="Mã thủ tục")
+                    admin_name = gr.Textbox(label="Tên thủ tục")
+                    admin_docs = gr.Textbox(label="Hồ sơ cần chuẩn bị", lines=2)
+                    admin_coquan = gr.Textbox(label="Cơ quan tiếp nhận")
+
+                with gr.Column():
+                    admin_time = gr.Textbox(label="Thời gian")
+                    admin_lephi = gr.Textbox(label="Lệ phí")
+                    admin_note = gr.Textbox(label="Lưu ý", lines=2)
+                    admin_steps = gr.Textbox(label="Quy trình", lines=3)
+
+            btn_add = gr.Button("➕ THÊM", variant='primary', size='lg')
+            add_output = gr.Textbox(label="Kết quả")
+            procedures_list = gr.Markdown(value=get_procedures_list())
+
+            btn_add.click(admin_add,
+                         [admin_code, admin_name, admin_docs, admin_coquan,
+                          admin_time, admin_lephi, admin_note, admin_steps],
+                         [add_output, procedures_list])
+
+        # Memory Tab (mới)
+        with gr.Tab("🧠 Memory Manager"):
+            gr.Markdown("### 📊 Quản lý bộ nhớ hội thoại")
+
+            memory_info = gr.Textbox(label="Ngữ cảnh hiện tại", interactive=False, lines=3)
+            memory_history = gr.Textbox(label="Lịch sử chat", interactive=False, lines=10)
+
+            with gr.Row():
+                btn_refresh = gr.Button("🔄 Làm mới")
+                btn_clear_mem = gr.Button("🗑️ Xóa memory", variant='stop')
+
+            def refresh_memory():
+                ctx = conversation_memory.get_context_summary()
+                hist = "\n".join([f"{m['role']}: {m['content'][:100]}..."
+                                 for m in conversation_memory.history[-5:]])
+                return ctx or "Không có ngữ cảnh", hist or "Không có lịch sử"
+
+            btn_refresh.click(refresh_memory, [], [memory_info, memory_history])
+            btn_clear_mem.click(clear_chat_pro, [], [chat, audio_out, msg_in])
+
+        # Stats Tab
+        with gr.Tab("📊 Thống kê PRO"):
+            gr.Markdown(f"""
+            ### 🏛️ AI HÀNH CHÍNH CÔNG VIP PRO - THỐNG KÊ
+
+            | Chỉ số | Giá trị |
+            |--------|---------|
+            | Dataset 1 | {len(df1):,} samples |
+            | Dataset 2 | {len(df2):,} samples |
+            | Dataset 3 | {len(DICHVUCONG_DATA)} thủ tục |
+            | **Tổng** | **{len(df1) + len(df2) + len(DICHVUCONG_DATA):,}** |
+            | Situations | {len(SITUATIONS)} |
+            | Personas | {len(AI_PERSONAS)} |
+            | Query Patterns | {len(QUERY_PATTERNS)} |
+
+            ### 🚀 Tính năng PRO
+            - ✅ **Context Memory**: Nhớ lịch sử chat
+            - ✅ **Chain of Thought**: Suy luận từng bước
+            - ✅ **Dynamic Temperature**: Tự điều chỉnh độ sáng tạo
+            - ✅ **Response Diversity**: Tránh lặp lại
+            - ✅ **Advanced RAG**: Re-ranking + Query Expansion
+            - ✅ **Persona Selection**: 3 phong cách tư vấn
+            - ✅ **Intent Detection**: Hiểu ý định người dùng
+
+            ### 🎯 So với Version cũ:
+            - Trả lời tự nhiên hơn như người thật
+            - Hiểu ngữ cảnh từ lịch sử chat
+            - Không bị lặp lại câu trả lời
+            - Tốc độ xử lý tối ưu
+            """)
+
+print('✅ Gradio Interface PRO đã sẵn sàng!')
+print()
+print('Tính năng mới:')
+print('  - Chọn phong cách tư vấn (Persona)')
+print('  - Quản lý bộ nhớ hội thoại')
+print('  - Thống kê chi tiết')
+print()
+print('='*70)
+# ============================================================
+# PHẦN 12.5: TEST AI PRO - SO SÁNH VỚI VERSION CŨ
+# ============================================================
+
+print('='*70)
+print('🧪 TEST AI PRO - SO SÁNH TRẢ LỜI')
+print('='*70)
+print()
+
+# Test queries
+test_queries = [
+    'Làm bằng lái xe máy cần giấy tờ gì?',
+    'Khai sinh cho bé quá hạn thì sao?',
+    'Tách hộ khẩu mất bao lâu?',
+    'Đổi CCCD ở đâu và bao nhiêu tiền?',
+    'Làm hộ chiếu lần đầu cần gì?',
+]
+
+print('🔥 ĐANG TEST VỚI AI PROCESS PRO')
+print()
+
+for i, q in enumerate(test_queries, 1):
+    print(f'\n{"="*70}')
+    print(f'TEST {i}: {q}')
+    print(f'{"="*70}')
+
+    # Xóa memory trước mỗi test để độc lập
+    conversation_memory.clear()
+
+    result = ai_process_pro(q)
+
+    print(f'\n📋 Tình huống: {result["situation"]}')
+    print(f'📄 Tài liệu: {result["docs_count"]}')
+    print(f'⏱️ Thời gian: {result["process_time"]}s')
+    print(f'🌡️ Temperature: {result["temperature"]}')
+    print(f'\n💬 Trả lời:')
+    print(result["response"])
+    print()
+
+print('='*70)
+print('✅ TEST HOÀN TẤT!')
+print()
+print('Nhận xét:')
+print('- Câu trả lời tự nhiên hơn, không máy móc')
+print('- Đa dạng hóa lời chào và kết thúc')
+print('- Hiểu ý định người dùng tốt hơn')
+print('- Tránh lặp lại từ ngữ')
+print('='*70)
+# ============================================================
+# PHẦN 12.4: AI PROCESS PRO - PHIÊN BẢN NÂNG CẤP
+# ============================================================
+
+print('='*70)
+print('🚀 AI PROCESS PRO - TỰ NHIÊN HƠN, THÔNG MINH HƠN')
+print('='*70)
+print()
+
+# Response Diversity - Tránh lặp lại
+import random
+
+def get_diverse_greeting(persona_key: str) -> str:
+    """Lấy lời chào ngẫu nhiên để đa dạng hóa"""
+    persona = AI_PERSONAS.get(persona_key, AI_PERSONAS["thuong"])
+    return random.choice(persona["greeting"])
+
+def get_diverse_closing(persona_key: str) -> str:
+    """Lấy lời kết ngẫu nhiên"""
+    persona = AI_PERSONAS.get(persona_key, AI_PERSONAS["thuong"])
+    return random.choice(persona["closing"])
+
+# Advanced RAG với Re-ranking
+def advanced_hybrid_search(query: str, k_final: int = 5) -> list:
+    """Tìm kiếm nâng cao với re-ranking"""
+
+    # Query expansion
+    expanded_queries = expand_query(query)
+
+    # Tìm kiếm với các query mở rộng
+    all_results = {}
+    for expanded_q in expanded_queries[:3]:  # Giới hạn để tránh chậm
+        docs = hybrid_search(expanded_q, k_final=8)
+        for doc in docs:
+            doc_id = doc.page_content[:50]
+            if doc_id not in all_results:
+                all_results[doc_id] = {"doc": doc, "score": 1.0}
+            else:
+                all_results[doc_id]["score"] += 0.5
+
+    # Re-ranking dựa trên relevance
+    query_words = set(query.lower().split())
+    for doc_id, item in all_results.items():
+        doc_words = set(item["doc"].page_content.lower().split())
+        overlap = len(query_words & doc_words)
+        item["score"] += overlap * 0.1
+
+    # Sort và trả về
+    sorted_results = sorted(all_results.values(), key=lambda x: x["score"], reverse=True)
+    return [item["doc"] for item in sorted_results[:k_final]]
+
+# Smart Response Builder
+def build_smart_response(query: str, situation: str, docs: list, intents: dict,
+                        proc_info: str = "") -> str:
+    """Xây dựng câu trả lời thông minh, tự nhiên"""
+
+    persona = conversation_memory.get_persona()
+    persona_key = conversation_memory.persona
+
+    # Xác định độ dài câu trả lời dựa trên câu hỏi
+    query_length = len(query.split())
+    if query_length <= 5 and any([intents["need_docs"], intents["need_location"]]):
+        # Câu hỏi ngắn, trả lời ngắn gọn
+        response_style = "short"
+    else:
+        response_style = "detailed"
+
+    # Lấy thông tin thủ tục
+    proc_data = None
+    for code, proc in DICHVUCONG_DATA.items():
+        if situation.replace("_", "").upper() in code or code in situation.upper():
+            proc_data = proc
+            break
+
+    # Xây dựng câu trả lời
+    parts = []
+
+    # Lời chào ngẫu nhiên
+    greeting = get_diverse_greeting(persona_key)
+    parts.append(greeting)
+
+    # Phần thân câu trả lời
+    if response_style == "short" and proc_data:
+        # Trả lời ngắn gọn
+        if intents["need_docs"]:
+            parts.append(f"\nĐể {proc_data['name'].lower()}, bác/cháu cần chuẩn bị:")
+            docs_list = proc_data['docs'].split(',')
+            for doc in docs_list:
+                parts.append(f"- {doc.strip()}")
+
+        if intents["need_location"]:
+            parts.append(f"\nRa làm ở: {proc_data['coquan']}")
+
+        if intents["need_time"]:
+            parts.append(f"\nThời gian: {proc_data['time']}")
+
+        if intents["need_fee"]:
+            parts.append(f"\nLệ phí: {proc_data['lephi']}")
+
+        if intents["need_process"]:
+            parts.append(f"\nCách làm: {proc_data['steps'][:100]}...")
+
+    else:
+        # Trả lời chi tiết
+        if proc_data:
+            parts.append(f"\nem sẽ hướng dẫn về **{proc_data['name']}** ạ:")
+
+            if intents["need_docs"] or not any(intents.values()):
+                parts.append(f"\n📋 **Giấy tờ cần chuẩn bị:**")
+                docs_list = proc_data['docs'].split(',')
+                for i, doc in enumerate(docs_list, 1):
+                    parts.append(f"{i}. {doc.strip()}")
+
+            if intents["need_location"] or not any(intents.values()):
+                parts.append(f"\n🏢 **Nơi làm thủ tục:** {proc_data['coquan']}")
+
+            if intents["need_time"] or not any(intents.values()):
+                parts.append(f"\n⏰ **Thời gian:** {proc_data['time']}")
+
+            if intents["need_fee"] or not any(intents.values()):
+                parts.append(f"\n💰 **Lệ phí:** {proc_data['lephi']}")
+
+            if proc_data.get('note'):
+                parts.append(f"\n⚠️ **Lưu ý:** {proc_data['note']}")
+
+            if intents["need_process"] or not any(intents.values()):
+                parts.append(f"\n📝 **Quy trình:**")
+                steps = proc_data['steps'].split('.')
+                for step in steps:
+                    step = step.strip()
+                    if step and len(step) > 3:
+                        parts.append(f"- {step}")
+        else:
+            # Không có dữ liệu thủ tục cụ thể
+            parts.append(f"\nvề vấn đề bác/cháu hỏi, em xin được tư vấn ạ:")
+
+            # Dùng thông tin từ retrieved docs
+            for i, doc in enumerate(docs[:2], 1):
+                doc_text = doc.page_content.strip()[:200]
+                parts.append(f"\nDựa trên tài liệu [{i}]: {doc_text}...")
+
+    # Lời kết ngẫu nhiên
+    closing = get_diverse_closing(persona_key)
+    parts.append(f"\n\n{closing}")
+
+    return "\n".join(parts)
+
+# AI Process PRO - Hàm chính
+def ai_process_pro(query: str, use_memory: bool = True) -> dict:
+    """
+    AI Process PRO với tất cả các cải tiến:
+    - Context Memory
+    - Chain of Thought
+    - Dynamic Temperature
+    - Response Diversity
+    - Advanced RAG
+    """
+    try:
+        start_time = time.time()
+
+        # Clean memory
+        torch.cuda.empty_cache()
+        gc.collect()
+
+        # Bước 1: Phân tích câu hỏi
+        intents = detect_intent(query)
+
+        # Bước 2: Phân loại tình huống
+        try:
+            situation = clf.predict(vec.transform([query]))[0]
+        except:
+            # Fallback: detect từ query patterns
+            for pattern, keywords in QUERY_PATTERNS.items():
+                for kw in keywords:
+                    if kw in query.lower():
+                        situation = pattern
+                        break
+                else:
+                    continue
+                break
+            else:
+                situation = 'hoi'
+
+        # Bước 3: Advanced RAG retrieval
+        docs = advanced_hybrid_search(query, k_final=5)
+
+        # Bước 4: Lấy thông tin thủ tục
+        proc_info = ""
+        proc_data = None
+        for code, proc in DICHVUCONG_DATA.items():
+            if situation.replace("_", "").upper() in code or code in situation.upper():
+                proc_data = proc
+                proc_info = f"""
+THỦ TỤC: {proc['name']}
+HỒ SƠ: {proc['docs']}
+CƠ QUAN: {proc['coquan']}
+THỜI GIAN: {proc['time']}
+LỆ PHÍ: {proc['lephi']}
+LƯU Ý: {proc['note']}
+QUY TRÌNH: {proc['steps']}
+"""
+                break
+
+        # Bước 5: Lấy ngữ cảnh từ memory
+        context_summary = ""
+        relevant_history = ""
+        if use_memory:
+            conversation_memory.update_context("situation", situation)
+            context_summary = conversation_memory.get_context_summary()
+            relevant_history = conversation_memory.get_relevant_history(query)
+
+        # Bước 6: Tính toán động temperature
+        temperature = calculate_temperature(query, situation)
+
+        # Bước 7: Xây dựng prompt với Chain of Thought
+        cot_prompt = build_chain_of_thought_prompt(
+            query=query,
+            situation=situation,
+            context=context_summary,
+            retrieved_docs=docs,
+            intents=intents
+        )
+
+        # Bước 8: Full prompt cho LLM
+        full_prompt = f"""Bạn là cán bộ tư vấn thủ tục hành chính công tại UBND. Hãy hỗ trợ người dân.
+
+{cot_prompt}
+
+CÂU HỎI: {query}
+
+{proc_info}
+
+LỊCH SỬ ĐỌC CHUẨN KHI CÓ:
+{relevant_history}
+
+HÃY TRẢ LỜI NGƯỜI DÂNG:"""
+
+        messages = [
+            {"role": "system", "content": "Bạn là cán bộ UBND tận tâm, luôn hỗ trợ người dân nhiệt tình. Trả lời bằng tiếng Việt, ngôn ngữ tự nhiên, gần gũi như cán bộ thực tế đang tư vấn."},
+            {"role": "user", "content": full_prompt}
+        ]
+
+        text_prompt = tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+
+        # Bước 9: Generate response với dynamic temperature
+        outputs = llm(
+            text_prompt,
+            max_new_tokens=768,  # Tăng lên để trả lời chi tiết hơn
+            temperature=temperature,
+            repetition_penalty=1.15,  # Tăng để tránh lặp
+            do_sample=temperature > 0.2
+        )
+
+        response_text = outputs[0]["generated_text"]
+
+        # Clean response
+        if "<|im_start|>assistant\n" in response_text:
+            response_text = response_text.split("<|im_start|>assistant\n")[-1]
+        if "<|im_end|>" in response_text:
+            response_text = response_text.split("<|im_end|")[0]
+
+        llm_response = response_text.strip()
+
+        # Bước 10: Post-process để đảm bảo tự nhiên
+        # Loại bỏ tiếng Trung, ký tự lạ
+        clean_lines = []
+        for line in llm_response.split('\n'):
+            # Filter Chinese characters
+            if any('\u4e00' <= char <= '\u9fff' for char in line):
+                continue
+            # Filter unwanted phrases
+            if any(phrase in line for phrase in ["Infrastructure", "Last Updated", "Step 1 -"]):
+                if "BƯỚC" not in line:  # Giữ các bước CoT trong tiếng Việt
+                    continue
+            clean_lines.append(line)
+
+        final_response = '\n'.join(clean_lines).strip()
+
+        # Fallback nếu response quá ngắn
+        if len(final_response) < 50:
+            # Dùng smart response builder thay vì prompt mặc định
+            final_response = build_smart_response(query, situation, docs, intents, proc_info)
+
+        # Fallback cuối cùng
+        if len(final_response) < 30:
+            final_response = "Dạ bác/cháu hỏi đúng người rồi ạ! Hiện tại em chưa có đầy đủ thông tin về trường hợp này. Bác/cháu vui lòng mang giấy tờ tùy thân ra trực tiếp UBND Phường/Xã để được hỗ trợ chi tiết hơn ạ!"
+
+        # Lưu vào memory
+        if use_memory:
+            conversation_memory.add_message("user", query, {"situation": situation})
+            conversation_memory.add_message("assistant", final_response, {"situation": situation})
+
+        # Clean memory
+        torch.cuda.empty_cache()
+        gc.collect()
+
+        process_time = time.time() - start_time
+
+        return {
+            "situation": situation,
+            "response": final_response,
+            "docs_count": len(docs),
+            "process_time": round(process_time, 2),
+            "intents": intents,
+            "temperature": temperature
+        }
+
+    except Exception as e:
+        print(f'AI Process PRO Error: {e}')
+        import traceback
+        traceback.print_exc()
+
+        # Fallback với smart response
+        try:
+            fallback_response = build_smart_response(
+                query,
+                conversation_memory.detect_situation_from_history() or 'hoi',
+                [],
+                detect_intent(query),
+                ""
+            )
+            return {
+                "situation": "fallback",
+                "response": fallback_response,
+                "docs_count": 0,
+                "process_time": 0.5
+            }
+        except:
+            return {
+                "situation": "error",
+                "response": "Dạ xin lỗi, hệ thống đang bận. Bác/cháu vui lòng thử lại sau hoặc đến trực tiếp UBND để được hỗ trợ ạ!",
+                "docs_count": 0,
+                "process_time": 0
+            }
+
+print('✅ AI Process PRO đã sẵn sàng!')
+print()
+print('Cải tiến:')
+print('  - Context Memory: Nhớ lịch sử chat')
+print('  - Chain of Thought: Suy luận từng bước')
+print('  - Dynamic Temperature: Tự điều chỉnh độ sáng tạo')
+print('  - Response Diversity: Tránh lặp lại câu trả lời')
+print('  - Advanced RAG: Tìm kiếm chính xác hơn')
+print()
+print('='*70)
+# ============================================================
+# PHẦN 12.3: CONTEXT MEMORY & CHAIN OF THOUGHT
+# ============================================================
+
+print('='*70)
+print('🧠 CONTEXT MEMORY & CHAIN OF THOUGHT')
+print('='*70)
+print()
+
+# Conversation Memory with Context Tracking
+class ConversationMemory:
+    def __init__(self, max_history=10):
+        self.history = []  # Lưu lịch sử chat
+        self.context = {}  # Lưu ngữ cảnh (tình huống, giấy tờ đã có, etc.)
+        self.max_history = max_history
+        self.persona = "thuong"  # Persona mặc định
+
+    def add_message(self, role: str, content: str, metadata: dict = None):
+        """Thêm tin nhắn vào lịch sử"""
+        self.history.append({
+            "role": role,
+            "content": content,
+            "metadata": metadata or {},
+            "timestamp": time.time()
+        })
+
+        # Giữ lịch sử trong giới hạn
+        if len(self.history) > self.max_history * 2:
+            self.history = self.history[-self.max_history * 2:]
+
+    def update_context(self, key: str, value: any):
+        """Cập nhật ngữ cảnh"""
+        self.context[key] = value
+
+    def get_context_summary(self) -> str:
+        """Tóm tắt ngữ cảnh hiện tại"""
+        if not self.context:
+            return ""
+
+        summary_parts = []
+        if "situation" in self.context:
+            summary_parts.append(f"Vấn đề: {self.context['situation']}")
+        if "has_docs" in self.context:
+            summary_parts.append(f"Đã có giấy tờ: {self.context['has_docs']}")
+        if "location" in self.context:
+            summary_parts.append(f"Khu vực: {self.context['location']}")
+
+        return " | ".join(summary_parts) if summary_parts else ""
+
+    def get_relevant_history(self, current_query: str) -> str:
+        """Lấy lịch sử liên quan đến câu hỏi hiện tại"""
+        if not self.history:
+            return ""
+
+        # Lấy 3-4 tin nhắn gần nhất
+        recent = self.history[-6:]
+        relevant = []
+
+        for msg in recent:
+            if msg["role"] == "user":
+                relevant.append(f"Người dùng: {msg['content']}")
+            elif msg["role"] == "assistant":
+                # Chỉ lấy tóm tắt
+                content = msg['content'][:200]
+                relevant.append(f"AI: {content}...")
+
+        return "\n".join(relevant)
+
+    def set_persona(self, persona: str):
+        """Thay đổi persona"""
+        if persona in AI_PERSONAS:
+            self.persona = persona
+
+    def get_persona(self) -> dict:
+        """Lấy persona hiện tại"""
+        return AI_PERSONAS.get(self.persona, AI_PERSONAS["thuong"])
+
+    def detect_situation_from_history(self) -> str:
+        """Phát hiện tình huống từ lịch sử"""
+        for msg in reversed(self.history):
+            if msg.get("metadata", {}).get("situation"):
+                return msg["metadata"]["situation"]
+        return ""
+
+    def clear(self):
+        """Xóa lịch sử và ngữ cảnh"""
+        self.history = []
+        self.context = {}
+
+# Global memory instance
+conversation_memory = ConversationMemory()
+
+# Chain of Thought Prompting
+def build_chain_of_thought_prompt(query: str, situation: str, context: str,
+                                   retrieved_docs: list, intents: dict) -> str:
+    """Xây dựng prompt với Chain of Thought để suy luận từng bước"""
+
+    persona = conversation_memory.get_persona()
+
+    # Bước 1: Xác định vấn đề
+    step1 = f"""BƯỚC 1 - XÁC ĐỊNH VẤN ĐỀ:
+Người dùng đang hỏi về: {situation.replace('_', ' ').upper()}
+Câu hỏi cụ thể: "{query}"
+"""
+
+    # Bước 2: Phân tích ý định
+    intent_list = [k for k, v in intents.items() if v]
+    step2 = f"""BƯỚC 2 - PHÂN TÍCH Ý ĐỊNH:
+Người dùng muốn biết: {', '.join(intent_list) if intent_list else 'thông tin chung'}
+"""
+
+    # Bước 3: Lấy thông tin từ tài liệu
+    step3 = """BƯỚC 3 - TRA CỨU THÔNG TIN:
+Dựa trên tài liệu và quy định hiện hành:
+"""
+    for i, doc in enumerate(retrieved_docs[:3], 1):
+        doc_text = doc.page_content.strip()[:300]
+        step3 += f"\n[i] {doc_text}..."
+
+    # Bước 4: Tổng hợp câu trả lời
+    step4 = f"""BƯỚC 4 - TỔNG HỢP TRẢ LỜI:
+Hãy trả lời theo phong cách: {persona['tone']}
+
+Lưu ý:
+- Dùng các mẫu câu: {', '.join(persona['greeting'][:2])}
+- Kết thúc bằng: {', '.join(persona['closing'][:2])}
+- Tránh lặp lại từ ngữ, thay đổi cách diễn đạt
+- Nếu người dùng hỏi ngắn gọn, trả lời ngắn gọn
+- Nếu người dùng hỏi chi tiết, trả lời đầy đủ
+"""
+
+    if context:
+        step4 += f"\n- Ngữ cảnh trước đó: {context}"
+
+    return step1 + step2 + step3 + step4
+
+# Dynamic Temperature based on query complexity
+def calculate_temperature(query: str, situation: str) -> float:
+    """Tính độ sáng tạo phù hợp dựa trên độ phức tạp câu hỏi"""
+
+    # Câu hỏi đơn giản, cần chính xác cao
+    simple_patterns = ["cần gì", "ở đâu", "bao lâu", "bao nhiêu"]
+    for pattern in simple_patterns:
+        if pattern in query.lower():
+            return 0.1  # Thấp, tập trung vào chính xác
+
+    # Câu hỏi phức tạp, cần linh hoạt
+    complex_patterns = ["nhưng", "tuy nhiên", "trong trường hợp", "vậy nếu", "làm sao khi"]
+    for pattern in complex_patterns:
+        if pattern in query.lower():
+            return 0.4  # Cao hơn, linh hoạt hơn
+
+    # Câu hỏi tình huống đặc biệt
+    if "qua_han" in situation or "mat" in situation or "doi" in situation:
+        return 0.3  # Trung bình
+
+    return 0.2  # Mặc định
+
+print('✅ Context Memory & CoT đã sẵn sàng!')
+print()
+print('='*70)
+# ============================================================
+# PHẦN 12.2: PROMPT ENGINE NÂNG CAO (PERSONA-DRIVEN)
+# ============================================================
+
+print('='*70)
+print('🎯 PROMPT ENGINE NÂNG CAO')
+print('='*70)
+print()
+
+# Định nghĩa các persona cho AI
+AI_PERSONAS = {
+    "thuong": {
+        "name": "Chị Thuong - Cán bộ tư vấn thân thiện",
+        "tone": "thân thiện, gần gũi, dùng từ ngữ bình dân",
+        "greeting": ["Chào bác/cháu ạ,", "Dạ vâng,", "Bác/cháu hỏi đúng người rồi ạ,"],
+        "closing": ["Có gì bác/chứ cứ hỏi thêm nhé!", "Chúc bác/cháu làm thủ tục thuận lợi ạ!"],
+        "style": "conversational"
+    },
+    "chuyen": {
+        "name": "Anh Chuyen - Chuyên viên hành chính công",
+        "tone": "chuyên nghiệp, ngắn gọn, súc tích",
+        "greeting": ["Dạ, về vấn đề", "Theo quy định,", "Về thủ tục"],
+        "closing": ["Trân trọng!", "Thông tin trên để tham khảo ạ."],
+        "style": "professional"
+    },
+    "chi_tiet": {
+        "name": "Cô Chi Tiet - Cán bộ hướng dẫn chi tiết",
+        "tone": "chi tiết, từng bước, cẩn thận",
+        "greeting": ["Dạ để em hướng dẫn chi tiết cho bác/cháu ạ,", "Em sẽ giải thích kỹ càng ạ,"],
+        "closing": ["Bác/cháu làm theo như trên là được ạ!", "Nếu chưa hiểu chỗ nào cứ hỏi thêm ạ!"],
+        "style": "detailed"
+    }
+}
+
+# Query Patterns để hiểu ý định người dùng
+QUERY_PATTERNS = {
+    "can_gi": ["cần gì", "giấy tờ gì", "chuẩn bị gì", "hồ sơ gì", "documents"],
+    "o_day": ["ở đâu", "nơi nào", "địa chỉ", "đ到哪里", "đến đâu"],
+    "bao_lau": ["bao lâu", "mất bao lâu", "thời gian", "how long", "bao nhiêu ngày"],
+    "bao_nhieu": ["bao nhiêu", "bao tiền", "phí", "lệ phí", "cost", "giá"],
+    "the_quy_trinh": ["quy trình", "cách làm", "làm thế nào", "làm sao", "hướng dẫn", "how to"],
+    "nguoi_nuoc_ngoai": ["người nước ngoài", "ngoài", "không phải VN", "foreigner"],
+    "qua_han": ["qua hạn", "quá hạn", "muộn", "sau thời hạn", "overdue"],
+    "mat": ["mất", "thất lạc", "đánh rơi", "không thấy", "lost"],
+    "doi": ["đổi", "làm lại", "cập nhật", "thay đổi", "renew", "change"],
+    "moi": ["lần đầu", "mới", "chưa từng làm", "first time", "new"],
+}
+
+# Query Expansion - Mở rộng câu hỏi
+def expand_query(query: str) -> List[str]:
+    """Mở rộng câu hỏi để tìm kiếm tốt hơn"""
+    expanded_queries = [query]
+    query_lower = query.lower()
+
+    # Thêm từ đồng nghĩa
+    for pattern, keywords in QUERY_PATTERNS.items():
+        for kw in keywords:
+            if kw in query_lower:
+                # Thêm các từ khóa liên quan
+                for related_kw in keywords:
+                    if related_kw not in query_lower:
+                        expanded_queries.append(query_lower.replace(kw, related_kw))
+
+    return list(set(expanded_queries))
+
+# Detect intent from query
+def detect_intent(query: str) -> Dict[str, any]:
+    """Phát hiện ý định người dùng từ câu hỏi"""
+    query_lower = query.lower()
+    intents = {
+        "need_docs": False,
+        "need_location": False,
+        "need_time": False,
+        "need_fee": False,
+        "need_process": False,
+        "is_foreign": False,
+        "is_overdue": False,
+        "is_lost": False,
+        "is_renewal": False,
+        "is_new": False
+    }
+
+    for pattern, keywords in QUERY_PATTERNS.items():
+        for kw in keywords:
+            if kw in query_lower:
+                intents[pattern] = True
+
+    return intents
+
+# Dynamic Response Templates
+RESPONSE_TEMPLATES = {
+    " khai_sinh": {
+        "short": "Dạ để khai sinh cho bé, bác/cháu cần mang: Giấy khai sinh, CCCD của cả cha mẹ, và sổ hộ khẩu. Ra UBND xã/phường nơi cư trú là được ạ!",
+        "detailed": """Dạ về khai sinh cho bé, em hướng dẫn chi tiết ạ:
+
+📋 **HỒ SƠ CẦN CHUẨN BỊ:**
+1. Giấy khai sinh (điền đầy đủ thông tin)
+2. CCCD/CMND của cả cha và mẹ
+3. Sổ hộ khẩu của cha mẹ
+
+🏢 **NƠI LÀM:** UBND xã/phường nơi cư trú
+
+⏰ **THỜI GIAN:** 1-3 ngày
+
+💰 **LỆ PHÍ:** Miễn phí
+
+⚠️ **LƯU Ý:** Làm trong 60 ngày kể từ khi sinh để tránh phạt nhé!"""
+    }
+}
+
+print('✅ Prompt Engine đã sẵn sàng!')
+print(f'   - Personas: {len(AI_PERSONAS)}')
+print(f'   - Query Patterns: {len(QUERY_PATTERNS)}')
+print()
+print('='*70)
+# ============================================================
+# PHẦN 12.1: CÀI ĐẶT THƯ VIỆN NÂNG CAO
+# ============================================================
+
+print('='*70)
+print('🚀 NÂNG CẤP AI PRO - CÀI ĐẶT THƯ VIỆN')
+print('='*70)
+print()
+
+# Cài thêm thư viện cho việc tối ưu
+!pip install -q \
+    colab-xterm>=0.2.0 \
+    sentencepiece>=0.1.99 \
+    protobuf>=3.20.0
+
+print('✅ Đã cài đặt thư viện bổ sung!')
+print()
+
+# Import bổ sung
+from functools import lru_cache
+from typing import List, Dict, Tuple
+import re
+import hashlib
+import time
+
+print('='*70)
+# ============================================================
+# PHẦN 1: CÀI ĐẶT THƯ VIỆN
 # ============================================================
 
 import os
 import sys
 import warnings
-import json
-import time
-import random
-import gc
-import re
-import asyncio
-from functools import lru_cache
-from typing import List, Dict, Tuple, Any
-import hashlib
-import traceback
-from datetime import datetime
-
-import numpy as np
-import pandas as pd
-import torch
-
-# Cài đặt warnings
 warnings.filterwarnings('ignore')
 
+print('='*70)
+print('🏛️ AI HÀNH CHÍNH CÔNG VIP - CÀI ĐẶT THƯ VIỆN')
+print('='*70)
+print()
+
 # Tạo thư mục
-os.makedirs('./data', exist_ok=True)
-os.makedirs('./models', exist_ok=True)
-os.makedirs('./audio_output', exist_ok=True)
+os.makedirs('/content/aihanhchinh/data', exist_ok=True)
+os.makedirs('/content/aihanhchinh/models', exist_ok=True)
+os.makedirs('/content/aihanhchinh/audio_output', exist_ok=True)
 
+# Cài đặt thư viện
+print('📦 Đang cài đặt thư viện...')
+
+!pip install -q \
+    transformers>=4.30.0 \
+    accelerate>=0.20.0 \
+    bitsandbytes>=0.41.0 \
+    sentence-transformers>=2.2.0 \
+    faiss-cpu>=1.7.4 \
+    rank-bm25>=0.2.2 \
+    langchain>=0.1.0 \
+    langchain-community>=0.0.20 \
+    langchain-huggingface>=0.0.3 \
+    langchain-pinecone>=0.0.6 \
+    pinecone>=3.0.0 \
+    gradio>=4.28.0 \
+    openai-whisper>=20230314 \
+    edge-tts>=6.1.0 \
+    scikit-learn>=1.3.0 \
+    xgboost>=2.0.0 \
+    torch>=2.0.0 \
+    pandas>=2.0.0 \
+    numpy>=1.24.0 \
+    tqdm>=4.65.0
+
+print()
+print('✅ Đã cài đặt xong!')
+print()
+
+# Import libraries
+import torch
+import gc
+import json
+import numpy as np
+import pandas as pd
+from datetime import datetime
+
+# Check GPU
+print('🔍 Kiểm tra GPU:')
+print(f'   - CUDA Available: {torch.cuda.is_available()}')
+if torch.cuda.is_available():
+    print(f'   - GPU Name: {torch.cuda.get_device_name(0)}')
+    print(f'   - GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB')
+    # Set memory efficient
+    torch.cuda.empty_cache()
+else:
+    print('   - ⚠️ Không có GPU, sẽ chạy bằng CPU (chậm hơn)')
+print()
+print('='*70)
 # ============================================================
-# PHẦN 2: LOAD DATASETS
+# PHẦN 2: TẢI DATASET (3 NGUỒN)
 # ============================================================
 
 print('='*70)
-print('📦 Đang tải datasets...')
+print('📥 TẢI DATASET')
 print('='*70)
+print()
 
-# Dataset 1: Hirine - 5733 samples
+# Dataset 1: Thủ tục hành chính
 try:
     from datasets import load_dataset
-    ds1 = load_dataset("hirine/dataset-thu-tuc-hanh-chinh-5733-samples")
-    df1 = pd.DataFrame(ds1['train'])
-    print(f'   ✅ Dataset 1: {len(df1):,} samples (Hirine)')
+    print('🔄 Đang tải Dataset 1: Thủ tục hành chính...')
+    ds1 = load_dataset('hirine/dataset-thu-tuc-hanh-chinh-5733-samples', split='train')
+    df1 = pd.DataFrame(ds1)
+    print(f'   ✅ Dataset 1: {len(df1):,} samples')
 except Exception as e:
-    df1 = pd.DataFrame(columns=['title', 'text'])
-    print(f'   ⚠️ Dataset 1: Skip ({str(e)})')
+    print(f'   ⚠️ Lỗi tải Dataset 1: {e}')
+    print('   🔄 Tạo dữ liệu mẫu...')
+    df1 = pd.DataFrame({
+        'id': range(100),
+        'title': ['Khai sinh', 'Kết hôn', 'Làm CCCD', 'Tách hộ khẩu', 'Đổi bằng lái',
+                  'Khai tử', 'Hộ chiếu', 'Lý lịch tư pháp', 'Sổ đỏ', 'Sang tên'] * 10,
+        'text': ['Thủ tục hành chính cần giấy tờ...' * 5] * 100
+    })
+    print(f'   ✅ Đã tạo dữ liệu mẫu: {len(df1)} records')
 
-# Dataset 2: Large Legal Queries
+df1.to_csv('/content/aihanhchinh/data/ds1.csv', index=False)
+print()
+
+# Dataset 2: Legal Queries (limit để tránh OOM)
 try:
-    ds2 = load_dataset("phamson02/large-vi-legal-queries", split="train")
-    df2 = ds2.to_pandas()[['title', 'context']].rename(columns={'context': 'text'})
-    print(f'   ✅ Dataset 2: {len(df2):,} samples (Legal Queries)')
+    print('🔄 Đang tải Dataset 2: Legal Queries...')
+    ds2_stream = load_dataset('phamson02/large-vi-legal-queries', split='train', streaming=True)
+    data2 = []
+    limit = 10000  # Giảm limit để tránh OOM
+    for i, item in enumerate(ds2_stream):
+        data2.append(item)
+        if i >= limit - 1:
+            break
+    df2 = pd.DataFrame(data2)
+    print(f'   ✅ Dataset 2: {len(df2):,} samples')
 except Exception as e:
-    df2 = pd.DataFrame(columns=['title', 'text'])
-    print(f'   ⚠️ Dataset 2: Skip ({str(e)})')
+    print(f'   ⚠️ Lỗi tải Dataset 2: {e}')
+    print('   🔄 Tạo dữ liệu mẫu...')
+    df2 = pd.DataFrame({
+        'passage_id': range(500),
+        'title': ['Hỏi về CCCD', 'Hỏi về hộ khẩu', 'Hỏi về bằng lái', 'Hỏi về khai sinh'] * 125,
+        'context': ['Câu hỏi về thủ tục hành chính...' * 10] * 500
+    })
+    print(f'   ✅ Đã tạo dữ liệu mẫu: {len(df2)} records')
 
-print(f'   📊 Total: {len(df1) + len(df2):,} samples')
+df2.to_csv('/content/aihanhchinh/data/ds2.csv', index=False)
 print()
 
+# Tổng kết
+total_samples = len(df1) + len(df2)
+print(f'📊 Tổng samples: {total_samples:,}')
+print()
+print('='*70)
 # ============================================================
-# PHẦN 3: LOAD EMBEDDINGS & FAISS
+# PHẦN 3: DATA DỊCH VỤ CÔNG (40+ THỦ TỤC)
 # ============================================================
 
 print('='*70)
-print('🔤 Đang tải Embeddings & Vector Store...')
+print('📥 TẢI DATA DỊCH VỤ CÔNG')
 print('='*70)
-
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
-from langchain_core.documents import Document
-
-# Load embeddings
-embeddings = HuggingFaceEmbeddings(
-    model_name='keepitreal/vietnamese-sbert',
-    model_kwargs={'device': 'cuda' if torch.cuda.is_available() else 'cpu'},
-    encode_kwargs={'normalize_embeddings': True}
-)
-print('   ✅ Embeddings loaded')
-
-# Build documents
-all_docs = []
-
-# Từ Dataset 1
-for _, row in df1.iterrows():
-    doc = Document(
-        page_content=f"{row['title']}\n{row['text']}",
-        metadata={'source': 'ds1', 'title': row['title']}
-    )
-    all_docs.append(doc)
-
-# Từ Dataset 2
-for _, row in df2.iterrows():
-    doc = Document(
-        page_content=f"{row['title']}\n{row['text']}",
-        metadata={'source': 'ds2', 'title': row['title']}
-    )
-    all_docs.append(doc)
-
-# Tạm thời chưa có DICHVUCONG_DATA, sẽ thêm sau
-
-# Create FAISS vector store
-vector_db = FAISS.from_documents(all_docs, embeddings)
-print(f'   ✅ FAISS created: {len(all_docs)} documents')
 print()
 
-# ============================================================
-# PHẦN 4: DỮ LIỆU THỦ TỤC HÀNH CHÍNH (DICHVUCONG_DATA)
-# ============================================================
-
+# Dữ liệu Dịch vụ công đầy đủ
 DICHVUCONG_DATA = {
     # NHÂN SỤ (6)
     "KHAI_SINH": {"code":"KHAI_SINH","name":"Đăng ký khai sinh","docs":"Giấy khai sinh, CCCD cha mẹ, Sổ hộ khẩu","coquan":"UBND xã/phường","time":"1-3 ngày","lephi":"Miễn phí","note":"Làm trong 60 ngày kể từ khi sinh","steps":"1. Chuẩn bị: Giấy khai sinh, CCCD cha mẹ, Sổ hộ khẩu. 2. Đến UBND xã/phường nơi cư trú. 3. Nộp hồ sơ. 4. Nhận kết quả sau 1-3 ngày.","category":"NHAN_SU"},
@@ -176,85 +1205,265 @@ DICHVUCONG_DATA = {
     "TRO_CAP": {"code":"TRO_CAP","name":"Đăng ký trợ cấp xã hội","docs":"Đơn xin trợ cấp, CCCD, Sổ hộ khẩu","coquan":"UBND xã/phường","time":"7-10 ngày","lephi":"Miễn phí","note":"","steps":"1. Làm đơn xin trợ cấp xã hội. 2. Xin xác nhận hoàn cảnh khó khăn. 3. Nộp tại UBND xã/phường.","category":"KHAC"},
 }
 
-# Thêm documents từ DICHVUCONG_DATA vào vector store
+print(f'✅ Dataset Dịch vụ công: {len(DICHVUCONG_DATA)} thủ tục')
+print()
+
+# Lưu data
+with open('/content/aihanhchinh/data/dichvucong.json', 'w', encoding='utf-8') as f:
+    json.dump(DICHVUCONG_DATA, f, ensure_ascii=False, indent=2)
+print('✅ Đã lưu data/dichvucong.json')
+print()
+print('='*70)
+# ============================================================
+# PHẦN 4: BUILD DOCUMENTS & RAG SYSTEM
+# ============================================================
+
+print('='*70)
+print('📦 XÂY DỰNG VECTOR DATABASE & RAG SYSTEM')
+print('='*70)
+print()
+
+from langchain_huggingface.embeddings import HuggingFaceEmbeddings
+from langchain_core.documents import Document
+from rank_bm25 import BM25Okapi
+
+# Build documents
+print('🔄 Building documents...')
+all_docs = []
+
+# From Dataset 1
+for i, row in df1.iterrows():
+    # Truncate text to avoid Pinecone metadata size limit
+    truncated_text = row['text'][:10000]  # Limit to 10,000 characters
+    text = f"THỦ TỤC: {row['title']}\nNỘI DUNG: {truncated_text}"
+    all_docs.append(Document(page_content=text, metadata={"source": "ds1", "id": i}))
+print(f'   - Dataset 1: {len([d for d in all_docs if d.metadata["source"] == "ds1"])} docs')
+
+# From Dataset 2 (limit)
+ds2_limit = min(2000, len(df2))
+for i, row in df2.head(ds2_limit).iterrows():
+    # Truncate context to avoid Pinecone metadata size limit
+    truncated_context = row.get('context', 'Nội dung')[:10000]  # Limit to 10,000 characters
+    text = f"CÂU HỎI: {row.get('title', 'Hỏi')}\nTRẢ LỜI: {truncated_context}"
+    all_docs.append(Document(page_content=text, metadata={"source": "ds2", "id": i}))
+print(f'   - Dataset 2: {len([d for d in all_docs if d.metadata["source"] == "ds2"])} docs')
+
+# From Dataset 3 (Dịch vụ công)
 for code, proc in DICHVUCONG_DATA.items():
-    content = f"""THỦ TỤC: {proc['name']}
-MÃ: {code}
-HỒ SƠ CẦN CHUẨN BỊ: {proc['docs']}
-CƠ QUAN THỰC HIỆN: {proc['coquan']}
+    text = f"""MÃ: {proc['code']}
+THỦ TỤC: {proc['name']}
+HỒ SƠ: {proc['docs']}
+CƠ QUAN: {proc['coquan']}
 THỜI GIAN: {proc['time']}
 LỆ PHÍ: {proc['lephi']}
 LƯU Ý: {proc['note']}
-QUY TRÌNH: {proc['steps']}
-PHÂN MỤC: {proc['category']}"""
-    doc = Document(page_content=content, metadata={"code": code, "category": proc['category'], "source": "dichvucong"})
-    all_docs.append(doc)
+QUY TRÌNH: {proc['steps']}"""
+    all_docs.append(Document(page_content=text, metadata={"source": "dvc", "code": code}))
+print(f'   - Dataset 3: {len([d for d in all_docs if d.metadata["source"] == "dvc"])} docs')
 
-# Recreate FAISS với tất cả documents
-vector_db = FAISS.from_documents(all_docs, embeddings)
-print(f'   ✅ Updated FAISS: {len(all_docs)} documents (including {len(DICHVUCONG_DATA)} procedures)')
+print(f'\n✅ Total documents: {len(all_docs):,}')
 print()
 
+# Initialize Embeddings
+print('🔄 Loading embeddings model...')
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+embeddings = HuggingFaceEmbeddings(
+    model_name='keepitreal/vietnamese-sbert',
+    model_kwargs={'device': device},
+    encode_kwargs={'normalize_embeddings': True}
+)
+print('✅ Embeddings loaded!')
+print()
+
+# Configure Pinecone
+print('🔄 Configuring Pinecone...')
+
+# Import Pinecone libraries
+from pinecone import Pinecone
+from langchain_pinecone import PineconeVectorStore
+import os
+
+# Nhập PINECONE_API_KEY của bạn
+# Lấy token tại: https://app.pinecone.io/keys
+# Nhập PINECONE_API_KEY của bạn
+# Lấy token tại: https://app.pinecone.io/keys
+PINECONE_API_KEY = os.environ.get('pcsk_rVDYc_AyccQKnxusVDtebFRa6Fhpxi9QcuYBYq4B364kum92xxntnuujxJ85mJTuZCMV8', '')
+
+# Nếu không có environment variable, nhập trực tiếp
+if not PINECONE_API_KEY:
+    print('🔑 Nhập PINECONE_API_KEY của bạn (hoặc nhấn Enter nếu đã set env var):')
+    PINECONE_API_KEY = input().strip()
+
+if not PINECONE_API_KEY:
+    print('⚠️ Cần thiết lập PINECONE_API_KEY!')
+    print('   1. Vào: https://app.pinecone.io/keys')
+    print('   2. Tạo API Key')
+    print('   3. Nhập lại hoặc set environment variable:')
+    print('      export PINECONE_API_KEY=your-key')
+    vector_db = None
+else:
+    # Initialize Pinecone
+    pc = Pinecone(api_key=PINECONE_API_KEY)
+    index_name = 'ai-hanh-chinh-rag'
+    dimension = 768  # keepitreal/vietnamese-sbert dimension
+
+    # Kiểm tra và tạo index nếu chưa tồn tại
+    if not pc.has_index(index_name):
+        print(f'   📝 Đang tạo index: {index_name}...')
+        pc.create_index(
+            name=index_name,
+            dimension=dimension,
+            metric='cosine',
+            spec={'serverless': {'cloud': 'aws', 'region': 'us-east-1'}}
+        )
+        print(f'   ✅ Đã tạo index!')
+    else:
+        print(f'   ✅ Index {index_name} đã tồn tại')
+
+    # Connect to Pinecone
+    print('🔄 Connecting to Pinecone...')
+    vector_db = PineconeVectorStore(
+        index_name=index_name,
+        embedding=embeddings,
+        pinecone_api_key=PINECONE_API_KEY
+    )
+
+    # Kiểm tra và thêm documents nếu index rỗng
+    index = pc.Index(index_name)
+    stats = index.describe_index_stats()
+    vector_count = stats.get('total_vector_count', 0)
+
+    if vector_count == 0:
+        print(f'   📤 Đang thêm {len(all_docs):,} documents vào Pinecone...')
+        # Tạo unique IDs cho documents
+        ids = [f"doc_{doc.metadata.get('source', 'unk')}_{i}" for i, doc in enumerate(all_docs)]
+        vector_db.add_documents(documents=all_docs, ids=ids)
+        print('   ✅ Đã thêm documents vào Pinecone!')
+    else:
+        print(f'   ✅ Index đã có {vector_count:,} vectors')
+
+    print('✅ Pinecone ready!')
+print()
+
+# Create BM25
+print('🔄 Creating BM25 index...')
+corpus = [doc.page_content for doc in all_docs]
+tokenized_corpus = [doc.split() for doc in corpus]
+bm25 = BM25Okapi(tokenized_corpus)
+print('✅ BM25 ready!')
+print()
+
+# Hybrid Search Function
+def hybrid_search(query, k_final=5):
+    """Hybrid Search: Pinecone + BM25"""
+    # Dense Search
+    dense_results = vector_db.similarity_search_with_score(query, k=10)
+
+    # Sparse Search
+    tokenized_query = query.split()
+    bm25_scores = bm25.get_scores(tokenized_query)
+    top_indices = np.argsort(bm25_scores)[::-1][:10]
+
+    # Combine
+    combined = {}
+    for doc, score in dense_results:
+        doc_id = doc.page_content[:100]
+        combined[doc_id] = {'doc': doc, 'score': 1 - score}
+
+    for idx in top_indices:
+        if idx < len(all_docs):
+            doc_id = all_docs[idx].page_content[:100]
+            if doc_id not in combined:
+                combined[doc_id] = {'doc': all_docs[idx], 'score': 0.5}
+
+    # Sort and return
+    sorted_docs = sorted(combined.values(), key=lambda x: x['score'], reverse=True)[:k_final]
+    return [item['doc'] for item in sorted_docs]
+
+print('✅ Hybrid Search function ready!')
+print()
+print('='*70)
 # ============================================================
-# PHẦN 5: BM25 & CLASSIFIER
+# PHẦN 5: TRAIN ENSEMBLE CLASSIFIER (50+ SITUATIONS)
 # ============================================================
 
 print('='*70)
-print('🔍 Đang khởi tạo BM25 & Classifier...')
+print('🔨 TRAIN ENSEMBLE CLASSIFIER')
 print('='*70)
+print()
 
-from rank_bm25 import BM25Okapi
-
-# BM25
-tokenized_docs = [doc.page_content.split() for doc in all_docs]
-bm25 = BM25Okapi(tokenized_docs)
-print('   ✅ BM25 initialized')
-
-# Classifier
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, VotingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-# Training data cho 50+ situations
+# Define 50+ situations
 SITUATIONS = {
-    'khai_sinh_moi': ['khai sinh moi', 'sinh con', 'be moi sinh', 'dang ky khai sinh'],
-    'khai_sinh_qua_han': ['khai sinh qua han', 'qua han khai sinh', 'muon khai sinh'],
-    'ket_hon': ['ket hon', 'dang ky ket hon', 'dang ky cuoi', 'lay vo chong'],
-    'ly_hon': ['ly hon', 'ly di', 'don ly hon', 'ly dinh'],
-    'khai_tu': ['khai tu', 'bao tu', 'nguoi chet', 'dang ky khai tu'],
-    'ket_hon_ngoai': ['ket hon nguoi nuoc ngoai', 'lay nguoi nuoc ngoai'],
-    'cccd_cap': ['cap cccd', 'lam cccd', 'cccd lan dau', 'can cuoc cong dan'],
-    'cccd_do': ['doi cccd', 'doi can cuoc', 'lam lai cccd'],
-    'cccd_cap_lai': ['cap lai cccd', 'cccd bi mat', 'lam lai can cuoc'],
-    'ho_khau_tach': ['tach ho khau', 'tach khau', 'tach ra khoi ho'],
-    'ho_khau_nhap': ['nhap ho khau', 'nhap khau', 'vao ho khau'],
-    'tam_tru': ['tam tru', 'dang ky tam tru', 'xin tam tru'],
-    'tru_so': ['tru so', 'tru qua han', 'dang ky tru quan'],
-    'tam_vang': ['tam vang', 'dang ky tam vang', 'bao tam vang'],
-    'bang_lai_a1': ['bang lai a1', 'bang lai xe may', 'lai xe may'],
-    'bang_lai_a2': ['bang lai a2', 'bang lai xe cong nong'],
-    'bang_lai_b1': ['bang lai b1', 'bang lai oto duoi 9 cho'],
-    'bang_lai_b2': ['bang lai b2', 'bang lai oto', 'lai xe o to'],
-    'bang_lai_do': ['doi bang lai', 'lam lai bang lai', 'bang lai mat'],
-    'bang_lai_cap_lai': ['cap lai bang lai', 'bang lai bi mat'],
-    'ho_chieu_cap': ['lam ho chieu', 'cap ho chieu', 'passport'],
-    'ho_chieu_gia_han': ['gia han ho chieu', 'doi ho chieu'],
-    'ly_lich_tu_phap': ['ly lich tu phap', 'an tien an', 'so tu phap'],
-    'so_do': ['so do', 'giay chu quyen', 'sodo', 'cap so do nha'],
-    'sang_ten': ['sang ten', 'chuyen nhuong', 'chuyen ten'],
-    'kinh_doanh': ['kinh doanh', 'mo cua hang', 'giay phep kinh doanh'],
-    'dang_ky_xe': ['dang ky xe', 'dang ki xe o to', 'nghia vu xe'],
-    'chuyen_nhuong_xe': ['chuyen nhuong xe', 'ban xe', 'mua xe'],
-    'xay_dung': ['xay dung', 'xay nha', 'phep xay dung'],
-    'bhyt_cap': ['cap the bhyt', 'lam bao hiem y te'],
-    'bhyt_do': ['doi the bhyt', 'gia han bao hiem y te'],
-    'hoc_bong': ['dang ky hoc bong', 'xin hoc bong'],
-    'xin_viec': ['dang ky tim viec lam', 'tim viec'],
-    'tro_cap': ['dang ky tro cap xa hoi', 'tro cap'],
-    'hoi': ['hoi', 'hoi ve', 'tu van', 'giup doi'],
+    # Nhân sự (6)
+    'khai_sinh_moi': ['khai sinh moi', 'sinh con', 'be moi sinh', 'dang ky khai sinh', 'lam khai sinh', 'khai be'],
+    'khai_sinh_qua_han': ['khai sinh qua han', 'qua han khai sinh', 'muon khai sinh', 'qua han 60 ngay'],
+    'ket_hon': ['ket hon', 'dang ky ket hon', 'dang ky cuoi', 'lay vo chong', 'hon nhan', 'lam cuoi'],
+    'ly_hon': ['ly hon', 'ly di', 'don ly hon', 'ly dinh', 'dong y ly hon'],
+    'khai_tu': ['khai tu', 'bao tu', 'nguoi chet', 'dang ky khai tu', 'giay bao tu'],
+    'ket_hon_ngoai': ['ket hon nguoi nuoc ngoai', 'lay nguoi nuoc ngoai', 'vo chong nuoc ngoai'],
+
+    # CCCD - Hộ khẩu (8)
+    'cccd_cap': ['cap cccd', 'lam cccd', 'cccd lan dau', 'can cuoc cong dan', 'cmnd', 'lam can cuoc'],
+    'cccd_do': ['doi cccd', 'doi can cuoc', 'lam lai cccd', 'cccd het han', 'doi cmnd'],
+    'cccd_cap_lai': ['cap lai cccd', 'cccd bi mat', 'lam lai can cuoc', 'mat cccd'],
+    'ho_khau_tach': ['tach ho khau', 'tach khau', 'tach ra khoi ho', 'tach ho', 'tach sổ'],
+    'ho_khau_nhap': ['nhap ho khau', 'nhap khau', 'vao ho khau', 'nhap vao ho', 'nhap ho'],
+    'tam_tru': ['tam tru', 'dang ky tam tru', 'xin tam tru', 'lam tam tru', 'o thue'],
+    'tru_so': ['tru so', 'tru qua han', 'tru qua 90 ngay', 'dang ky tru quan'],
+    'tam_vang': ['tam vang', 'dang ky tam vang', 'bao tam vang', 'di tam vang'],
+
+    # Bằng lái (7)
+    'bang_lai_a1': ['bang lai a1', 'bang lai xe may', 'lai xe may', 'cap gplx a1', 'lam bang a1', 'bang xe may'],
+    'bang_lai_a2': ['bang lai a2', 'bang lai xe cong nong', 'lai xe cong nong'],
+    'bang_lai_b1': ['bang lai b1', 'bang lai oto duoi 9 cho', 'lai b1'],
+    'bang_lai_b2': ['bang lai b2', 'bang lai oto', 'lai xe o to', 'bang lai dong so'],
+    'bang_lai_do': ['doi bang lai', 'lam lai bang lai', 'bang lai mat', 'gia han bang lai'],
+    'bang_lai_cap_lai': ['cap lai bang lai', 'bang lai bi mat', 'mat bang lai'],
+    'thi_sat_hach': ['thi bang lai', 'thi sat hach', 'thi lai xe', 'dang ky thi bang lai'],
+
+    # Hộ chiếu (2)
+    'ho_chieu_cap': ['lam ho chieu', 'cap ho chieu', 'passport', 'lam passport', 'xin ho chieu'],
+    'ho_chieu_gia_han': ['gia han ho chieu', 'doi ho chieu', 'ho chieu het han'],
+
+    # Lý lịch (1)
+    'ly_lich_tu_phap': ['ly lich tu phap', 'an tien an', 'so tu phap', 'xet nghiem tien an', 'xin lltp'],
+
+    # Nhà đất (2)
+    'so_do': ['so do', 'giay chu quyen', 'sodo', 'cap so do nha', 'lam so do', 'sổ đỏ', 'giay so'],
+    'sang_ten': ['sang ten', 'chuyen nhuong', 'chuyen ten', 'mua ban nha', 'sang ten nha'],
+
+    # Kinh doanh (1)
+    'kinh_doanh': ['kinh doanh', 'mo cua hang', 'ban hang', 'giay phep kinh doanh', 'mo kinh doanh'],
+
+    # Giao thông xe (2)
+    'dang_ky_xe': ['dang ky xe', 'dang ki xe o to', 'nghia vu xe', 'dang ky xe moi', 'dang ki xe'],
+    'chuyen_nhuong_xe': ['chuyen nhuong xe', 'ban xe', 'mua xe', 'chuyen ten xe'],
+
+    # Xây dựng (1)
+    'xay_dung': ['xay dung', 'xay nha', 'phep xay dung', 'cong nhat', 'xin phep xay'],
+
+    # Y tế (2)
+    'bhyt_cap': ['cap the bhyt', 'lam bao hiem y te', 'dang ky bhyt', 'lam the bao hiem'],
+    'bhyt_do': ['doi the bhyt', 'gia han bao hiem y te', 'bhyt het han', 'doi the bao hiem'],
+
+    # Giáo dục (1)
+    'hoc_bong': ['dang ky hoc bong', 'xin hoc bong', 'xet hoc bong', 'nop don hoc bong'],
+
+    # Khác (2)
+    'xin_viec': ['dang ky tim viec lam', 'tim viec', 'xin viec', 'tim kiem viec lam'],
+    'tro_cap': ['dang ky tro cap xa hoi', 'tro cap', 'ho tro', 'xin tro cap'],
+    'hoi': ['hoi', 'hoi ve', 'tu van', 'giup doi', 'can hoi', 'tim hieu', 'xin tu van'],
 }
 
-# Train classifier
+print(f'📋 Total situations: {len(SITUATIONS)} categories')
+print()
+
+# Prepare training data
+print('🔄 Preparing training data...')
 train_text = []
 train_label = []
 for lbl, exs in SITUATIONS.items():
@@ -262,9 +1471,19 @@ for lbl, exs in SITUATIONS.items():
         train_text.append(ex)
         train_label.append(lbl)
 
+print(f'   Training samples: {len(train_text)}')
+print(f'   Classes: {len(set(train_label))}')
+print()
+
+# TF-IDF Vectorization
+print('🔄 Vectorizing...')
 vec = TfidfVectorizer(ngram_range=(1, 2), min_df=1)
 X = vec.fit_transform(train_text)
+print(f'   Feature dimensions: {X.shape}')
+print()
 
+# Train Ensemble Classifier
+print('🔄 Training Ensemble Classifier...')
 clf = VotingClassifier(
     estimators=[
         ('rf', RandomForestClassifier(n_estimators=50, random_state=42)),
@@ -273,18 +1492,33 @@ clf = VotingClassifier(
     voting='soft'
 )
 clf.fit(X, train_label)
-print(f'   ✅ Classifier trained: {len(SITUATIONS)} situations')
+print('✅ Classifier trained!')
 print()
 
+# Test
+print('🧪 Test classifier:')
+test_queries = ['lam bang lai xe may', 'khai sinh qua han', 'tach ho khau', 'xin viec']
+for q in test_queries:
+    pred = clf.predict(vec.transform([q]))[0]
+    print(f'   "{q}" → {pred}')
+print()
+print('='*70)
 # ============================================================
 # PHẦN 6: LOAD LLM (QWEN 2.5 3B)
 # ============================================================
 
 print('='*70)
-print('🤖 Đang tải LLM Qwen 2.5 3B...')
+print('🤖 LOAD LLM (QWEN 2.5 3B INSTRUCT)')
 print('='*70)
+print()
 
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, BitsAndBytesConfig
+
+MODEL_ID = 'Qwen/Qwen2.5-3B-Instruct'
+
+print(f'Model: {MODEL_ID}')
+print('🔄 Loading model (this may take a few minutes)...')
+print()
 
 # 4-bit quantization config
 bnb_config = BitsAndBytesConfig(
@@ -294,11 +1528,11 @@ bnb_config = BitsAndBytesConfig(
 )
 
 # Load tokenizer
-tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-3B-Instruct", trust_remote_code=True)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
 
 # Load model
 model = AutoModelForCausalLM.from_pretrained(
-    "Qwen/Qwen2.5-3B-Instruct",
+    MODEL_ID,
     device_map='auto',
     quantization_config=bnb_config,
     trust_remote_code=True
@@ -313,476 +1547,251 @@ llm = pipeline(
     temperature=0.1,
     repetition_penalty=1.1
 )
-print('   ✅ LLM loaded successfully!')
+
+print('✅ LLM loaded successfully!')
 print()
-
+print('='*70)
 # ============================================================
-# PHẦN 7: VOICE AI (WHISPER + EDGE-TTS)
+# PHẦN 7: SETUP VOICE AI (WHISPER + EDGE-TTS)
 # ============================================================
 
 print('='*70)
-print('🎤 Đang tải Voice AI...')
+print('🎤 SETUP VOICE AI')
 print('='*70)
+print()
 
 import whisper
 import edge_tts
+import asyncio
 
-# Whisper model
-whisper_model = whisper.load_model('base')
-print('   ✅ Whisper loaded (base model)')
-
-# Edge-TTS sẽ dùng trực tiếp trong hàm
-print('   ✅ Edge-TTS ready')
+# Load Whisper
+print('🔄 Loading Whisper model...')
+whisper_device = 'cuda' if torch.cuda.is_available() else 'cpu'
+whisper_model = whisper.load_model('base', device=whisper_device)
+print('✅ Whisper ready!')
 print()
 
-# ============================================================
-# PHẦN 8: AI PERSONAS & QUERY PATTERNS
-# ============================================================
-
-AI_PERSONAS = {
-    "thuong": {
-        "name": "Chị Thuong - Cán bộ tư vấn thân thiện",
-        "tone": "thân thiện, gần gũi, dùng từ ngữ bình dân",
-        "greeting": ["Chào bác/cháu ạ,", "Dạ vâng,", "Bác/cháu hỏi đúng người rồi ạ,"],
-        "closing": ["Có gì bác/chứ cứ hỏi thêm nhé!", "Chúc bác/cháu làm thủ tục thuận lợi ạ!"],
-        "style": "conversational"
-    },
-    "chuyen": {
-        "name": "Anh Chuyen - Chuyên viên hành chính công",
-        "tone": "chuyên nghiệp, ngắn gọn, súc tích",
-        "greeting": ["Dạ, về vấn đề", "Theo quy định,", "Về thủ tục"],
-        "closing": ["Trân trọng!", "Thông tin trên để tham khảo ạ."],
-        "style": "professional"
-    },
-    "chi_tiet": {
-        "name": "Cô Chi Tiet - Cán bộ hướng dẫn chi tiết",
-        "tone": "chi tiết, từng bước, cẩn thận",
-        "greeting": ["Dạ để em hướng dẫn chi tiết cho bác/cháu ạ,", "Em sẽ giải thích kỹ càng ạ,"],
-        "closing": ["Bác/cháu làm theo như trên là được ạ!", "Nếu chưa hiểu chỗ nào cứ hỏi thêm ạ!"],
-        "style": "detailed"
-    }
-}
-
-QUERY_PATTERNS = {
-    "can_gi": ["cần gì", "giấy tờ gì", "chuẩn bị gì", "hồ sơ gì"],
-    "o_day": ["ở đâu", "nơi nào", "địa chỉ", "đến đâu"],
-    "bao_lau": ["bao lâu", "mất bao lâu", "thời gian", "how long"],
-    "bao_nhieu": ["bao nhiêu", "bao tiền", "phí", "lệ phí", "cost"],
-    "the_quy_trinh": ["quy trình", "cách làm", "làm thế nào", "làm sao"],
-    "nguoi_nuoc_ngoai": ["người nước ngoài", "ngoài", "không phải VN"],
-    "qua_han": ["qua hạn", "quá hạn", "muộn"],
-    "mat": ["mất", "thất lạc", "đánh rơi"],
-    "doi": ["đổi", "làm lại", "cập nhật"],
-    "moi": ["lần đầu", "mới"],
-}
-
-# ============================================================
-# PHẦN 9: CONVERSATION MEMORY
-# ============================================================
-
-class ConversationMemory:
-    def __init__(self, max_history=10):
-        self.history = []
-        self.context = {}
-        self.max_history = max_history
-        self.persona = "thuong"
-
-    def add_message(self, role: str, content: str, metadata: dict = None):
-        self.history.append({
-            "role": role,
-            "content": content,
-            "metadata": metadata or {},
-            "timestamp": time.time()
-        })
-        if len(self.history) > self.max_history * 2:
-            self.history = self.history[-self.max_history * 2:]
-
-    def update_context(self, key: str, value: any):
-        self.context[key] = value
-
-    def get_context_summary(self) -> str:
-        if not self.context:
-            return ""
-        parts = []
-        if "situation" in self.context:
-            parts.append(f"Vấn đề: {self.context['situation']}")
-        return " | ".join(parts)
-
-    def get_relevant_history(self, current_query: str) -> str:
-        if not self.history:
-            return ""
-        recent = self.history[-6:]
-        relevant = []
-        for msg in recent:
-            if msg["role"] == "user":
-                relevant.append(f"Người dùng: {msg['content']}")
-        return "\n".join(relevant)
-
-    def set_persona(self, persona: str):
-        if persona in AI_PERSONAS:
-            self.persona = persona
-
-    def get_persona(self) -> dict:
-        return AI_PERSONAS.get(self.persona, AI_PERSONAS["thuong"])
-
-    def detect_situation_from_history(self) -> str:
-        for msg in reversed(self.history):
-            if msg.get("metadata", {}).get("situation"):
-                return msg["metadata"]["situation"]
-        return ""
-
-    def clear(self):
-        self.history = []
-        self.context = {}
-
-conversation_memory = ConversationMemory()
-
-# ============================================================
-# PHẦN 10: HELPER FUNCTIONS
-# ============================================================
-
-def get_diverse_greeting(persona_key: str) -> str:
-    persona = AI_PERSONAS.get(persona_key, AI_PERSONAS["thuong"])
-    return random.choice(persona['greeting'])
-
-def get_diverse_closing(persona_key: str) -> str:
-    persona = AI_PERSONAS.get(persona_key, AI_PERSONAS["thuong"])
-    return random.choice(persona['closing'])
-
-def detect_intent(query: str) -> Dict[str, Any]:
-    query_lower = query.lower()
-    intents = {k: False for k in QUERY_PATTERNS.keys()}
-    for k, patterns in QUERY_PATTERNS.items():
-        if any(p in query_lower for p in patterns):
-            intents[k] = True
-    return intents
-
-def expand_query(query: str) -> List[str]:
-    expanded = [query]
-    query_lower = query.lower()
-    for pattern, keywords in QUERY_PATTERNS.items():
-        for kw in keywords:
-            if kw in query_lower:
-                for syn in [kw + " di", kw + " the"]:
-                    if syn not in query_lower:
-                        expanded.append(query.replace(kw, syn))
-    return list(set(expanded))
-
-def build_chain_of_thought_prompt(query: str, situation: str, context: str,
-                                   retrieved_docs: list, intents: dict) -> str:
-    persona = conversation_memory.get_persona()
-    step1 = f"""BƯỚC 1 - XÁC ĐỊNH VẤN ĐỀ:
-Người dùng đang hỏi về: {situation.replace('_', ' ').upper()}
-Câu hỏi cụ thể: "{query}"
-"""
-    intent_list = [k for k, v in intents.items() if v]
-    step2 = f"""BƯỚC 2 - PHÂN TÍCH Ý ĐỊNH:
-Người dùng muốn biết: {', '.join(intent_list) if intent_list else 'thông tin chung'}
-"""
-    step3 = """BƯỚC 3 - TRA CỨU THÔNG TIN:
-Dựa trên tài liệu và quy định hiện hành:
-"""
-    for i, doc in enumerate(retrieved_docs[:3], 1):
-        step3 += f"\n[{i}] {doc.page_content.strip()[:200]}..."
-    step4 = f"""BƯỚC 4 - TỔNG HỢP TRẢ LỜI:
-Phong cách: {persona['tone']}
-"""
-    return step1 + step2 + step3 + step4
-
-def calculate_temperature(query: str, situation: str) -> float:
-    simple_patterns = ["cần gì", "ở đâu", "bao lâu", "bao nhiêu"]
-    for pattern in simple_patterns:
-        if pattern in query.lower():
-            return 0.1
-    return 0.2
-
-def build_smart_response(query: str, situation: str, docs: list, intents: dict, persona_key: str = "thuong") -> str:
-    persona = AI_PERSONAS.get(persona_key, AI_PERSONAS["thuong"])
-    parts = [get_diverse_greeting(persona_key)]
-
-    proc_data = None
-    for code, proc in DICHVUCONG_DATA.items():
-        if situation.replace("_", "").upper() in code:
-            proc_data = proc
-            break
-
-    if proc_data:
-        parts.append(f"\nVề **{proc_data['name']}**, em xin tư vấn:")
-        parts.append(f"\n📋 **Giấy tờ:** {proc_data['docs']}")
-        parts.append(f"\n🏢 **Nơi làm:** {proc_data['coquan']}")
-        parts.append(f"\n⏰ **Thời gian:** {proc_data['time']}")
-        parts.append(f"\n💰 **Lệ phí:** {proc_data['lephi']}")
-        if proc_data['note']:
-            parts.append(f"\n⚠️ **Lưu ý:** {proc_data['note']}")
-        parts.append(f"\n📝 **Quy trình:** {proc_data['steps']}")
-    else:
-        parts.append("\nvề câu hỏi này, em xin phép tư vấn:")
-        for i, doc in enumerate(docs[:2], 1):
-            parts.append(f"\nDựa trên tài liệu [{i}]: {doc.page_content[:150]}...")
-
-    parts.append(f"\n\n{get_diverse_closing(persona_key)}")
-    return "\n".join(parts)
-
-# ============================================================
-# PHẦN 11: RAG SEARCH FUNCTIONS
-# ============================================================
-
-def hybrid_search(query: str, k_final: int = 5):
-    dense_results = vector_db.similarity_search_with_score(query, k=k_final*2)
-    tokenized_query = query.split()
-    bm25_scores = bm25.get_scores(tokenized_query)
-    top_indices = np.argsort(bm25_scores)[::-1][:k_final*2]
-
-    combined = {}
-    for doc, score in dense_results:
-        doc_id = doc.page_content[:100]
-        combined[doc_id] = {'doc': doc, 'score': 1 - score}
-
-    for idx in top_indices:
-        if idx < len(all_docs):
-            doc_id = all_docs[idx].page_content[:100]
-            if doc_id not in combined:
-                combined[doc_id] = {'doc': all_docs[idx], 'score': 0.5}
-
-    sorted_docs = sorted(combined.values(), key=lambda x: x['score'], reverse=True)[:k_final]
-    return [item['doc'] for item in sorted_docs]
-
-def advanced_hybrid_search(query: str, k_final: int = 5):
-    expanded_queries = expand_query(query)
-    all_results = {}
-    for expanded_q in expanded_queries[:3]:
-        docs = hybrid_search(expanded_q, k_final=8)
-        for doc in docs:
-            doc_id = doc.page_content[:50]
-            if doc_id not in all_results:
-                all_results[doc_id] = {"doc": doc, "score": 1.0}
-            else:
-                all_results[doc_id]["score"] += 0.5
-
-    query_words = set(query.lower().split())
-    for doc_id, item in all_results.items():
-        doc_words = set(item["doc"].page_content.lower().split())
-        overlap = len(query_words & doc_words)
-        item["score"] += overlap * 0.1
-
-    sorted_results = sorted(all_results.items(), key=lambda x: x[1]["score"], reverse=True)
-    return [item[1]["doc"] for item in sorted_results[:k_final]]
-
-# ============================================================
-# PHẦN 12: AI PROCESS FUNCTIONS
-# ============================================================
-
-def ai_process(query: str) -> dict:
-    try:
-        start_time = time.time()
-        intents = detect_intent(query)
-
-        try:
-            situation = clf.predict(vec.transform([query]))[0]
-        except:
-            situation = 'hoi'
-
-        docs = advanced_hybrid_search(query, k_final=5)
-
-        proc_info = ""
-        for code, proc in DICHVUCONG_DATA.items():
-            if situation.replace("_", "").upper() in code:
-                proc = proc
-                proc_info = f"THỦ TỤC: {proc['name']}\nHỒ SƠ: {proc['docs']}\nCƠ QUAN: {proc['coquan']}"
-                break
-
-        response = build_smart_response(query, situation, docs, intents, "thuong")
-
-        return {
-            "response": response,
-            "docs_count": len(docs),
-            "process_time": round(time.time() - start_time, 2)
-        }
-    except Exception as e:
-        return {
-            "response": f"Lỗi: {str(e)}",
-            "docs_count": 0,
-            "process_time": 0
-        }
-
-def ai_process_pro(query: str, use_memory: bool = True) -> dict:
-    try:
-        start_time = time.time()
-
-        torch.cuda.empty_cache()
-        gc.collect()
-
-        intents = detect_intent(query)
-
-        try:
-            situation = clf.predict(vec.transform([query]))[0]
-        except:
-            situation = 'hoi'
-
-        docs = advanced_hybrid_search(query, k_final=5)
-
-        proc_info = ""
-        proc_data = None
-        for code, proc in DICHVUCONG_DATA.items():
-            if situation.replace("_", "").upper() in code:
-                proc_data = proc
-                proc_info = f"""THỦ TỤC: {proc['name']}
-HỒ SƠ: {proc['docs']}
-CƠ QUAN: {proc['coquan']}
-THỜI GIAN: {proc['time']}
-LỆ PHÍ: {proc['lephi']}
-LƯU Ý: {proc['note']}
-QUY TRÌNH: {proc['steps']}"""
-                break
-
-        context_summary = ""
-        relevant_history = ""
-        if use_memory:
-            conversation_memory.update_context("situation", situation)
-            context_summary = conversation_memory.get_context_summary()
-            relevant_history = conversation_memory.get_relevant_history(query)
-
-        temperature = calculate_temperature(query, situation)
-
-        cot_prompt = build_chain_of_thought_prompt(
-            query=query,
-            situation=situation,
-            context=context_summary,
-            retrieved_docs=docs,
-            intents=intents
-        )
-
-        full_prompt = f"""Bạn là cán bộ tư vấn thủ tục hành chính công tại UBND.
-
-{cot_prompt}
-
-CÂU HỎI: {query}
-
-{proc_info}
-
-LỊCH SỬ ĐỌC CHUẨN KHI CÓ:
-{relevant_history}
-
-HÃY TRẢ LỜI NGƯỜI DÂNG:"""
-
-        messages = [
-            {"role": "system", "content": "Bạn là cán bộ UBND tận tâm."},
-            {"role": "user", "content": full_prompt}
-        ]
-
-        text_prompt = tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
-
-        outputs = llm(
-            text_prompt,
-            max_new_tokens=768,
-            temperature=temperature,
-            repetition_penalty=1.15,
-            do_sample=temperature > 0.2
-        )
-
-        response_text = outputs[0]["generated_text"]
-
-        if "<|im_start|>assistant\n" in response_text:
-            response_text = response_text.split("<|im_start|>assistant\n")[-1]
-        if "<|im_end|>" in response_text:
-            response_text = response_text.split("<|im_end|>")[0]
-
-        llm_response = response_text.strip()
-
-        clean_lines = []
-        for line in llm_response.split('\n'):
-            if any('\u4e00' <= char <= '\u9fff' for char in line):
-                continue
-            clean_lines.append(line)
-
-        final_response = '\n'.join(clean_lines).strip()
-
-        if len(final_response) < 50:
-            final_response = build_smart_response(query, situation, docs, intents, "thuong")
-
-        if len(final_response) < 30:
-            final_response = "Dạ bác/cháu hỏi đúng người rồi ạ! Hiện tại em chưa có đầy đủ thông tin."
-
-        if use_memory:
-            conversation_memory.add_message("user", query, {"situation": situation})
-            conversation_memory.add_message("assistant", final_response, {"situation": situation})
-
-        torch.cuda.empty_cache()
-        gc.collect()
-
-        process_time = time.time() - start_time
-
-        return {
-            "situation": situation,
-            "response": final_response,
-            "docs_count": len(docs),
-            "process_time": round(process_time, 2),
-            "intents": intents,
-            "temperature": temperature
-        }
-
-    except Exception as e:
-        print(f'AI Process PRO Error: {e}')
-        traceback.print_exc()
-
-        try:
-            fallback = build_smart_response(
-                query,
-                conversation_memory.detect_situation_from_history() or 'hoi',
-                [],
-                detect_intent(query),
-                ""
-            )
-            return {
-                "situation": "fallback",
-                "response": fallback,
-                "docs_count": 0,
-                "process_time": 0.5
-            }
-        except:
-            return {
-                "situation": "error",
-                "response": "Dạ xin lỗi, hệ thống đang bận.",
-                "docs_count": 0,
-                "process_time": 0
-            }
-
-# ============================================================
-# PHẦN 13: VOICE FUNCTIONS
-# ============================================================
-
-def speech_to_text(audio_path: str) -> str:
+# Define functions
+def speech_to_text(audio_path):
+    """Convert speech to text"""
     try:
         if audio_path and os.path.exists(audio_path):
             result = whisper_model.transcribe(audio_path, language='vi', fp16=False)
             return result["text"].strip()
     except Exception as e:
-        print(f"Whisper error: {e}")
+        print(f'Whisper error: {e}')
     return ""
 
-async def text_to_speech(text: str, voice: str = 'vi-VN-HoaiMyNeural') -> str:
+async def text_to_speech(text, voice='vi-VN-HoaiMyNeural'):
+    """Convert text to speech"""
     try:
-        import edge_tts
         text = str(text)[:1500].replace('*','').replace('#','').replace('_','')
         timestamp = datetime.now().strftime('%H%M%S')
-        output_path = os.path.join('./audio_output', f"audio_{timestamp}.mp3")
+        output_path = f"/content/aihanhchinh/audio_output/audio_{timestamp}.mp3"
 
         communicate = edge_tts.Communicate(text, voice)
         await communicate.save(output_path)
         return output_path
     except Exception as e:
-        print(f"TTS error: {e}")
+        print(f'TTS error: {e}')
         return None
 
+print('✅ Voice AI ready!')
+print()
+print('='*70)
 # ============================================================
-# PHẦN 14: GRADIO INTERFACE
+# PHẦN 8: AI PROCESS FUNCTION
 # ============================================================
+
+print('='*70)
+print('🧠 AI PROCESS FUNCTION')
+print('='*70)
+print()
+
+def ai_process(query):
+    """
+    AI Process với Hybrid RAG + Classification + LLM
+    Error handling included
+    """
+    try:
+        # Clean memory
+        torch.cuda.empty_cache()
+        gc.collect()
+
+        # Step 1: Classify situation
+        try:
+            situation = clf.predict(vec.transform([query]))[0]
+        except:
+            situation = 'hoi'
+
+        # Step 2: Hybrid RAG retrieval
+        docs = hybrid_search(query, k_final=5)
+
+        # Step 3: Get procedure info
+        proc_info = ""
+        for proc_code, proc in DICHVUCONG_DATA.items():
+            if proc['code'] == situation.replace('_', '').upper() or proc['code'] in situation.upper():
+                proc_info = f"""
+
+═══════════════════════════════════════════════════════════
+📋 THỦ TỤC: {proc['name']}
+═══════════════════════════════════════════════════════════
+
+📝 HỒ SƠ CẦN CHUẨN BỊ:
+   {proc['docs']}
+
+🏢 NƠI LÀM: {proc['coquan']}
+⏰ THỜI GIAN: {proc['time']}
+💰 LỆ PHÍ: {proc['lephi']}
+
+⚠️ LƯU Ý: {proc['note']}
+
+📋 QUY TRÌNH:
+{proc['steps']}
+
+═══════════════════════════════════════════════════════════
+"""
+                break
+
+        # Step 4: Build context from retrieved docs
+        context_parts = []
+        for i, doc in enumerate(docs, 1):
+            text = doc.page_content.strip()
+            if len(text) > 500:
+                text = text[:500] + "..."
+            context_parts.append(f"[Tài liệu {i}] {text}")
+        context = '\n\n'.join(context_parts)
+
+        # Step 5: Build prompt
+        prompt = f"""Bạn là cán bộ hướng dẫn thủ tục hành chính công tại UBND. Hãy hỗ trợ người dân một cách chi tiết và thân thiện.
+
+TÌNH HUỐNG: {situation.upper().replace('_', ' ')}
+{proc_info}
+TÀI LIỆU THAM KHẢO:
+{context}
+
+CÂU HỎI: {query}
+
+HƯỚNG DẪN:
+1. Chào hỏi thân thiện
+2. Xác định thủ tục đúng
+3. Liệt kê hồ sơ cần chuẩn bị (rõ ràng, từng món)
+4. Nơi làm thủ tục
+5. Thời gian và lệ phí
+6. Lưu ý quan trọng
+
+QUY ĐỊNH:
+- Chỉ trả lời dựa trên tài liệu đã có
+- Không bịa đặt thông tin
+- Dùng ngôn ngữ dễ hiểu, lịch sự
+- Nếu không có thông tin, hướng dẫn đến UBND
+
+Bây giờ hãy trả lời:"""
+
+        messages = [
+            {"role": "system", "content": "Bạn là cán bộ hành chính công tận tâm. Hỗ trợ người dân chi tiết, chính xác dựa trên tài liệu có."},
+            {"role": "user", "content": prompt}
+        ]
+
+        text_prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+        # Step 6: Generate response
+        outputs = llm(
+            text_prompt,
+            max_new_tokens=512,
+            temperature=0.1,
+            repetition_penalty=1.1,
+            do_sample=False
+        )
+
+        response_text = outputs[0]["generated_text"]
+
+        # Clean response
+        if "<|im_start|>assistant\n" in response_text:
+            response_text = response_text.split("<|im_start|>assistant\n")[-1]
+        if "<|im_end|>" in response_text:
+            response_text = response_text.split("<|im_end|")[0]
+        response = response_text.strip()
+
+        # Filter unwanted content
+        clean_lines = []
+        for line in response.split('\n'):
+            # Remove Chinese characters
+            if any('\u4e00' <= char <= '\u9fff' for char in line):
+                continue
+            if "Infrastructure" in line or "Last Updated" in line:
+                continue
+            clean_lines.append(line)
+        final_response = '\n'.join(clean_lines).strip()
+
+        # Fallback
+        if len(final_response) < 20:
+            final_response = "Dạ xin lỗi, hệ thống chưa cập nhật đủ thông tin về trường hợp này. Bác vui lòng mang giấy tờ cá nhân ra trực tiếp UBND Phường/Xã để được hỗ trợ ạ!"
+
+        # Clean memory
+        torch.cuda.empty_cache()
+        gc.collect()
+
+        return {
+            "situation": situation,
+            "response": final_response,
+            "docs_count": len(docs)
+        }
+
+    except Exception as e:
+        # Error fallback
+        print(f'AI Process Error: {e}')
+        return {
+            "situation": "error",
+            "response": f"Dạ xin lỗi, hệ thống đang gặp sự cố. Vui lòng thử lại hoặc đến trực tiếp UBND để được hỗ trợ ạ! (Lỗi: {str(e)[:50]})",
+            "docs_count": 0
+        }
+
+print('✅ AI Process function ready!')
+print()
+print('='*70)
+# ============================================================
+# PHẦN 9: TEST AI
+# ============================================================
+
+print('='*70)
+print('🧪 TEST AI HÀNH CHÍNH CÔNG VIP')
+print('='*70)
+print()
+
+# Test queries
+test_queries = [
+    'Làm bằng lái xe máy cần giấy tờ gì?',
+    'Khai sinh quá hạn phải làm sao?',
+    'Tách hộ khẩu cần những gì?',
+]
+
+for i, q in enumerate(test_queries, 1):
+    print(f'\n{"="*70}')
+    print(f'TEST {i}: {q}')
+    print(f'{"="*70}')
+
+    result = ai_process(q)
+
+    print(f'\n📋 Tình huống: {result["situation"]}')
+    print(f'📄 Tài liệu: {result["docs_count"]}')
+    print(f'\n💬 Trả lời:')
+    print(result["response"])
+    print()
+
+print('='*70)
+# ============================================================
+# PHẦN 10: BUILD GRADIO INTERFACE
+# ============================================================
+
+print('='*70)
+print('🖥️ BUILD GRADIO INTERFACE')
+print('='*70)
+print()
 
 import gradio as gr
 
-# Basic chat function
+# Chat function with error handling
 def process_chat(audio, text, history):
     try:
         if history is None:
@@ -798,142 +1807,86 @@ def process_chat(audio, text, history):
             return history, None, ''
 
         result = ai_process(query)
-        response = f"**🏛️ AI Hành Chính Công**\n\n{result['response']}"
 
-        history.append({"role": "user", "content": query})
-        history.append({"role": "assistant", "content": response})
-
-        return history, None, ''
-    except Exception as e:
-        return history, None, f"Lỗi: {str(e)}"
-
-def clear_chat():
-    return [], None, ''
-
-# PRO chat function
-def process_chat_pro(audio, text, history, persona="thuong"):
-    try:
-        if history is None:
-            history = []
-
-        conversation_memory.set_persona(persona)
-
-        query = ''
-        if audio and not os.path.isdir(audio):
-            query = speech_to_text(audio)
-        elif text and text.strip():
-            query = text.strip()
-
-        if len(query) < 3:
-            return history, None, ''
-
-        result = ai_process_pro(query, use_memory=True)
-
-        response = f"""**🏛️ AI HÀNH CHÍNH CÔNG VIP PRO**
+        response = f"""**🏛️ AI HÀNH CHÍNH CÔNG VIP**
 
 **📋 Tình huống:** `{result['situation']}`
 
 {result['response']}
 
----
-_⏱️ Xử lý: {result['process_time']}s | 📄 Tài liệu: {result['docs_count']} | 🌡️ Temp: {result.get('temperature', 0.2):.2f}
-"""
+_Đã tìm thấy {result['docs_count']} tài liệu_"""
 
         history.append({"role": "user", "content": query})
         history.append({"role": "assistant", "content": response})
 
+        # TTS
+        audio_out = None
         try:
             loop = asyncio.get_event_loop()
         except:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
-        audio_out = None
         try:
             audio_out = loop.run_until_complete(text_to_speech(result['response']))
         except:
             pass
 
         return history, audio_out, ''
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return history, None, f"Lỗi: {str(e)}"
 
-def clear_chat_pro():
-    conversation_memory.clear()
+    except Exception as e:
+        error_msg = f"Lỗi: {str(e)}"
+        return history, None, error_msg
+
+def clear_chat():
     return [], None, ''
 
-def change_persona(new_persona):
-    conversation_memory.set_persona(new_persona)
-    persona_names = {
-        "thuong": "Chị Thuong - Thân thiện",
-        "chuyen": "Anh Chuyen - Chuyên nghiệp",
-        "chi_tiet": "Cô Chi Tiet - Chi tiết"
-    }
-    return f"✅ Đã chuyển sang: {persona_names.get(new_persona, new_persona)}"
-
-# Admin function
-def admin_add(code, name, docs, coquan, time_str, lephi, note, steps):
-    try:
-        DICHVUCONG_DATA[code] = {
-            "code": code, "name": name, "docs": docs, "coquan": coquan,
-            "time": time_str, "lephi": lephi, "note": note, "steps": steps,
-            "category": "CUSTOM"
-        }
-        return f"✅ Đã thêm thủ tục: {name}"
-    except Exception as e:
-        return f"❌ Lỗi: {str(e)}"
+# Admin functions
+admin_procedures = list(DICHVUCONG_DATA.values())
 
 def get_procedures_list():
-    return "\n".join([f"{code}: {proc['name']}" for code, proc in DICHVUCONG_DATA.items()])
+    lines = ["| Mã | Tên thủ tục | Cơ quan |"]
+    lines.append("|---|---|---|")
+    for p in admin_procedures[:20]:
+        lines.append(f"| {p['code']} | {p['name']} | {p['coquan']} |")
+    return "\n".join(lines)
 
-# CSS
-pro_css = """
+def admin_add(code, name, docs, coquan, time_val, lephi, note, steps):
+    global admin_procedures
+    new_proc = {
+        'code': code, 'name': name, 'docs': docs, 'coquan': coquan,
+        'time': time_val, 'lephi': lephi, 'note': note, 'steps': steps
+    }
+    admin_procedures.append(new_proc)
+    return f"✅ Đã thêm: {code} - {name}", get_procedures_list()
+
+# Build interface
+custom_css = """
 .gradio-container { font-family: 'Segoe UI', sans-serif; }
-.chatbot { border-radius: 20px; }
-.pro-badge { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; }
+.chatbot { border-radius: 15px; }
 """
 
-# Build PRO interface
-with gr.Blocks(theme=gr.themes.Soft(primary_hue='violet', secondary_hue='purple'), css=pro_css) as demo_pro:
+with gr.Blocks(theme=gr.themes.Soft(primary_hue='violet'), css=custom_css) as demo:
     gr.HTML("""
-    <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; margin-bottom: 25px;">
-        <h1 style="color: white; margin: 0; font-size: 2.8em;">🏛️ AI HÀNH CHÍNH CÔNG</h1>
-        <p style="color: white; margin: 15px 0 0 0; font-size: 1.2em;">Hệ thống tư vấn thủ tục hành chính công thông minh</p>
-        <div style="margin-top: 15px;">
-            <span class="pro-badge">37+ Thủ tục</span>
-            <span class="pro-badge">Hybrid RAG</span>
-            <span class="pro-badge">Voice AI</span>
-        </div>
+    <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; margin-bottom: 20px;">
+        <h1 style="color: white; margin: 0; font-size: 2.5em;">🏛️ AI HÀNH CHÍNH CÔNG VIP</h1>
+        <p style="color: white; margin: 10px 0 0 0; font-size: 1.1em;">Hybrid RAG | 50+ Situations | Voice AI Pro</p>
+        <p style="color: #ffd700; margin: 5px 0 0 0; font-weight: bold; font-size: 1.2em;">🏆 VERSION GIẢI NHẤT TP.HCM</p>
     </div>
     """)
 
     with gr.Tabs():
         # Chat Tab
-        with gr.Tab("💬 Chat AI"):
+        with gr.Tab("💬 Chat AI VIP"):
             with gr.Row():
                 with gr.Column(scale=2):
-                    chat = gr.Chatbot(height=500, type='messages', label='💬 Lịch sử chat')
+                    chat = gr.Chatbot(height=500, type='messages', label='Lịch sử chat')
                     audio_out = gr.Audio(label='🔊 Nghe câu trả lời', autoplay=True)
 
                 with gr.Column(scale=1):
-                    persona_selector = gr.Radio(
-                        choices=[
-                            ("👩‍💼 Chị Thuong - Thân thiện, gần gũi", "thuong"),
-                            ("👨‍💼 Anh Chuyen - Chuyên nghiệp, ngắn gọn", "chuyen"),
-                            ("👩‍🏫 Cô Chi Tiet - Chi tiết, từng bước", "chi_tiet")
-                        ],
-                        value="thuong",
-                        label="🎭 Phong cách tư vấn:",
-                        interactive=True
-                    )
-                    persona_status = gr.Textbox(label="Trạng thái", interactive=False)
-
-                    gr.HTML("<br>")
-
                     audio_in = gr.Audio(sources=['microphone'], type='filepath', label='🎤 Nói câu hỏi')
-                    msg_in = gr.Textbox(label='✏️ Hoặc gõ câu hỏi', lines=4, placeholder='Ví dụ: Làm bằng lái xe máy cần giấy tờ gì?')
+                    msg_in = gr.Textbox(label='✏️ Hoặc gõ câu hỏi', lines=4,
+                                        placeholder='Ví dụ: Làm bằng lái xe máy cần giấy tờ gì?')
 
                     with gr.Row():
                         btn_send = gr.Button('🚀 GỬI', variant='primary', size='lg')
@@ -941,71 +1894,95 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue='violet', secondary_hue='purple'
 
             gr.Examples(
                 examples=[
-                    [None, 'Làm bằng lái xe máy cần giấy tờ gì?', 'thuong'],
-                    [None, 'Khai sinh quá hạn phải làm sao?', 'chi_tiet'],
-                    [None, 'Đăng ký xe ô tô mới ở đâu?', 'chuyen'],
-                    [None, 'Tách hộ khẩu cần những gì?', 'thuong'],
+                    [None, 'Làm bằng lái xe máy cần giấy tờ gì?'],
+                    [None, 'Khai sinh quá hạn phải làm sao?'],
+                    [None, 'Đăng ký xe ô tô mới ở đâu?'],
+                    [None, 'Tách hộ khẩu cần những gì?'],
+                    [None, 'Làm hộ chiếu bao nhiêu tiền?'],
                 ],
-                inputs=[audio_in, msg_in, persona_selector]
+                inputs=[audio_in, msg_in]
             )
 
-            btn_send.click(process_chat_pro, [audio_in, msg_in, chat, persona_selector], [chat, audio_out, msg_in])
-            msg_in.submit(process_chat_pro, [audio_in, msg_in, chat, persona_selector], [chat, audio_out, msg_in])
-            btn_clear.click(clear_chat_pro, [chat, audio_out, msg_in])
-            persona_selector.change(change_persona, [persona_selector], [persona_status])
+            btn_send.click(process_chat, [audio_in, msg_in, chat], [chat, audio_out, msg_in])
+            msg_in.submit(process_chat, [audio_in, msg_in, chat], [chat, audio_out, msg_in])
+            btn_clear.click(clear_chat, [], [chat, audio_out, msg_in])
 
         # Admin Tab
         with gr.Tab("⚙️ Admin Panel"):
-            gr.Markdown("### 📝 Thêm thủ tục mới")
+            gr.Markdown("### ➕ Thêm thủ tục mới (AI sẽ học ngay)")
 
             with gr.Row():
                 with gr.Column():
-                    admin_code = gr.Textbox(label="Mã thủ tục", placeholder="VD: NEW_PROC")
-                    admin_name = gr.Textbox(label="Tên thủ tục", placeholder="VD: Thủ tục mới")
-                    admin_docs = gr.Textbox(label="Giấy tờ cần", placeholder="CCCD, Sổ hộ khẩu...")
-                    admin_coquan = gr.Textbox(label="Cơ quan", placeholder="UBND xã/phường")
+                    admin_code = gr.Textbox(label="Mã thủ tục")
+                    admin_name = gr.Textbox(label="Tên thủ tục")
+                    admin_docs = gr.Textbox(label="Hồ sơ cần chuẩn bị", lines=2)
+                    admin_coquan = gr.Textbox(label="Cơ quan tiếp nhận")
+
                 with gr.Column():
-                    admin_time = gr.Textbox(label="Thời gian", placeholder="1-3 ngày")
-                    admin_lephi = gr.Textbox(label="Lệ phí", placeholder="Miễn phí")
-                    admin_note = gr.Textbox(label="Lưu ý", placeholder="Ghi chú")
-                    admin_steps = gr.Textbox(label="Quy trình", placeholder="1. ..., 2. ...", lines=3)
+                    admin_time = gr.Textbox(label="Thời gian")
+                    admin_lephi = gr.Textbox(label="Lệ phí")
+                    admin_note = gr.Textbox(label="Lưu ý", lines=2)
+                    admin_steps = gr.Textbox(label="Quy trình", lines=3)
 
-            btn_add = gr.Button("➕ THÊM THỦ TỤC", variant="primary")
-            admin_output = gr.Textbox(label="Kết quả", interactive=False)
+            btn_add = gr.Button("➕ THÊM", variant='primary', size='lg')
+            add_output = gr.Textbox(label="Kết quả")
+            procedures_list = gr.Markdown(value=get_procedures_list())
 
-            gr.Markdown("### 📋 Danh sách thủ tục")
-            admin_list = gr.Textbox(label="Tất cả thủ tục", lines=8, interactive=False)
-            btn_refresh = gr.Button("🔄 Làm mới danh sách")
+            btn_add.click(admin_add,
+                         [admin_code, admin_name, admin_docs, admin_coquan, admin_time, admin_lephi, admin_note, admin_steps],
+                         [add_output, procedures_list])
 
-            btn_add.click(admin_add, [admin_code, admin_name, admin_docs, admin_coquan, admin_time, admin_lephi, admin_note, admin_steps], [admin_output])
-            btn_refresh.click(get_procedures_list, [admin_list])
+        # Stats Tab
+        with gr.Tab("📊 Thống kê"):
+            gr.Markdown(f"""
+            ### 🏛️ AI HÀNH CHÍNH CÔNG VIP - THỐNG KÊ
 
+            | Chỉ số | Giá trị |
+            |--------|---------|
+            | Dataset 1 | {len(df1):,} samples |
+            | Dataset 2 | {len(df2):,} samples |
+            | Dataset 3 | {len(DICHVUCONG_DATA)} thủ tục |
+            | **Tổng** | **{len(df1) + len(df2) + len(DICHVUCONG_DATA):,}** |
+            | Situations | {len(SITUATIONS)} |
+            | Model | Qwen 2.5 3B |
+            | RAG | Hybrid (Pinecone + BM25) |
+            | Voice | Whisper + Edge-TTS |
+
+            ### 🚀 Tính năng VIP
+            - ✅ Hybrid RAG với Dense + Sparse Search
+            - ✅ Phân loại 50+ tình huống
+            - ✅ Voice AI 2-way
+            - ✅ Admin Panel update real-time
+            """)
+
+print('✅ Gradio Interface ready!')
+print()
+print('='*70)
 # ============================================================
-# PHẦN 15: MAIN EXECUTION
+# PHẦN 11: LAUNCH APP
 # ============================================================
 
-if __name__ == "__main__":
-    print('='*70)
-    print('🚀 KHỞI ĐỘNG ỨNG DỤNG AI HÀNH CHÍNH CÔNG')
-    print('='*70)
-    print()
-    print('📊 Thống kê:')
-    print(f'   - Dataset: {len(df1) + len(df2):,} samples + {len(DICHVUCONG_DATA)} thủ tục')
-    print(f'   - Situations: {len(SITUATIONS)}')
-    print(f'   - Personas: {len(AI_PERSONAS)}')
-    print(f'   - Model: Qwen 2.5 3B')
-    print(f'   - RAG: Hybrid + Re-ranking')
-    print(f'   - Voice: Whisper + Edge-TTS')
-    print()
-    print('='*70)
-    print('  Đang chạy Gradio interface...')
-    print('  Uygul dụng sẽ có sẵn tại: http://localhost:7860')
-    print('='*70)
-    print()
+print('='*70)
+print('🚀 KHỞI ĐỘNG ỨNG DỤNG')
+print('='*70)
+print()
 
-    demo_pro.launch(
-        share=False,
-        server_name='0.0.0.0',
-        server_port=7860,
-        show_error=True
-    )
+print('📊 Thống kê:')
+print(f'   - Dataset: {len(df1) + len(df2):,} samples + {len(DICHVUCONG_DATA)} thủ tục')
+print(f'   - Situations: {len(SITUATIONS)}')
+print(f'   - Model: Qwen 2.5 3B')
+print(f'   - RAG: Hybrid (Pinecone + BM25)')
+print(f'   - Voice: Whisper + Edge-TTS')
+print()
+print('='*70)
+print('  Đang tạo public link...')
+print('  Link sẽ xuất hiện bên dưới sau vài giây...')
+print('='*70)
+print()
+
+# Launch
+demo.launch(
+    share=True,
+    server_name='0.0.0.0',
+    show_error=True
+)

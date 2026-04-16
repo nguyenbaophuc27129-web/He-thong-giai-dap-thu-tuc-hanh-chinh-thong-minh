@@ -13,6 +13,7 @@ Chạy train model AI, ML, LLM cho hệ thống tư vấn thủ tục hành chí
 - **NVIDIA (R) Cuda compiler driver**: release 11.5, V11.5.119
 - **GPU**: 80GB, **CPU**: 64GB
 - **Conda**: 23.1.0
+- **Pinecone**: Cloud vector database for embeddings ( cần PINECONE_API_KEY)
 
 ---
 
@@ -40,8 +41,12 @@ python3 main.py
 ### Tham số cấu hình
 - **Model LLM**: Qwen/Qwen2.5-3B-Instruct
 - **4-bit Quantization**: Giảm bộ nhớ mà vẫn giữ độ chính xác
-- **Embeddings Model**: keepitreal/vietnamese-sbert
-- **Vector Store**: FAISS (Dense Search) + BM25 (Sparse Search)
+- **Embeddings Model**: keepitreal/vietnamese-sbert (768 dimensions)
+- **Vector Store**: Pinecone (Dense Search) + BM25 (Sparse Search)
+  - Index name: ai-hanh-chinh-rag
+  - Metric: cosine
+  - Serverless on AWS us-east-1
+  - Cần thiết lập `PINECONE_API_KEY` environment variable
 - **Voice AI**: Whisper (base) + Edge-TTS
 - **Temperature**: 0.1 - 0.7 (tự điều chỉnh theo độ phức tạp câu hỏi)
 - **Max Tokens**: 1024 cho câu trả lời
@@ -51,10 +56,11 @@ python3 main.py
 ## Mô tả các chức năng chính
 
 ### 1. Hybrid RAG System
-- **Dense Search**: FAISS + Vietnamese SBERT embeddings
+- **Dense Search**: Pinecone + Vietnamese SBERT embeddings
 - **Sparse Search**: BM25 keyword matching
 - **Query Expansion**: Mở rộng câu hỏi với từ đồng nghĩa
 - **Re-ranking**: Sắp xếp kết quả theo độ liên quan
+- **Pinecone Integration**: Embeddings được lưu trữ trên Pinecone cloud database
 
 ### 2. Phân loại tình huống (50+ situations)
 - Ensemble Classifier (Random Forest + Logistic Regression)
@@ -133,6 +139,23 @@ AIHanhChinh/
 - Có thể thực thi từ đầu đến cuối mà không cần sự can thiệp
 - Tự động tải datasets từ HuggingFace Hub
 - Tự động tạo các thư mục cần thiết
+
+### Thiết lập Pinecone API Key
+Trước khi chạy, cần thiết lập `PINECONE_API_KEY`:
+```bash
+# Linux/Mac
+export PINECONE_API_KEY='your-api-key-here'
+
+# Windows CMD
+set PINECONE_API_KEY=your-api-key-here
+
+# Windows PowerShell
+$env:PINECONE_API_KEY='your-api-key-here'
+```
+
+Hoặc nhập trực tiếp vào code (không khuyến khích cho production).
+
+Lấy API key tại: https://app.pinecone.io/keys
 
 ---
 
